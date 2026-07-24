@@ -1,0 +1,163 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap');
+
+@import "tailwindcss";
+
+/*
+ * GaliMotors brand system — Deep Navy + Gold.
+ * "coral" is the historical token name for the PRIMARY brand color (deep navy).
+ * Gold is an accent for fills and dark-surface highlights ONLY — it fails
+ * contrast as text on white; use gold-dark for text-gold on light surfaces.
+ * pharmacore-gray / brand-* are legacy aliases kept so older markup resolves.
+ */
+@theme {
+  --color-dark: #101418;
+  --color-dark-muted: #0A0D10;
+  --color-coral: #13293D;
+  --color-coral-light: #E8EEF4;
+  --color-coral-dark: #0E1F2F;
+  --color-gold: #D9A404;
+  --color-gold-light: #FAF1DA;
+  --color-gold-dark: #8A6A00;
+  --color-surface: #FFFFFF;
+  --color-muted: #F7F7F5;
+  --color-border: #E8E7E3;
+  --color-text-primary: #101418;
+  --color-text-secondary: #6E6D66;
+  --color-text-tertiary: #9C9A92;
+  --color-success: #1E7B4F;
+  --color-success-light: #E7F2EB;
+  --color-warning: #B45309;
+  --color-warning-light: #FBEFE0;
+  --color-danger: #B42318;
+  --color-danger-light: #FBECEA;
+  --color-info: #1C5D99;
+  --color-info-light: #E8F0F8;
+  --color-gray-50: #FAFAFB;
+  --color-gray-100: #F6F6F8;
+  --color-gray-200: #E6E7EB;
+  --color-gray-300: #D3D5DB;
+  --color-gray-400: #A4A7B0;
+  --color-gray-500: #696C78;
+  --color-gray-600: #535662;
+  --color-gray-700: #3D4050;
+  --color-gray-800: #262A3B;
+  --color-gray-900: #14172B;
+  --color-gray-950: #0C1129;
+  --color-pharmacore-gray: #F6F6F8;
+  --color-brand-dark: #14172B;
+  --color-brand-medium: #535662;
+  --color-brand-coral: #1C2A5E;
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  /* Same display face as the customer site — one brand, two apps. */
+  --font-display: "Plus Jakarta Sans", "Inter", sans-serif;
+}
+
+@layer base {
+  html {
+    /* 70% shrank every rem-based size to two-thirds — page text rendered
+       ~10-11px and the whole panel read as miniature. 87.5% (14px base) is
+       standard dense-dashboard scale. */
+    font-size: 87.5%;
+  }
+
+  body {
+    @apply bg-muted text-text-primary font-sans antialiased;
+    font-size: 1rem;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  /* Headline voice, matching the dealership. */
+  h1, h2 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-coral text-white px-4 py-2 rounded-lg text-sm font-medium
+           hover:bg-coral-dark hover:shadow-md hover:shadow-coral/20
+           active:scale-[0.98] transition-all duration-200;
+  }
+
+  .btn-secondary {
+    @apply bg-surface text-text-primary px-4 py-2 rounded-lg text-sm font-medium
+           border border-border hover:bg-muted active:scale-[0.98] transition-all duration-200;
+  }
+
+  .card-widget {
+    @apply bg-surface border border-border rounded-xl shadow-sm;
+  }
+
+  /* Standard form control. Referenced across most admin pages (search boxes,
+     editors, textareas) — was undefined after the restyle, leaving those
+     fields browser-default. Matches CustomSelect's face and coral focus. */
+  .filter-select {
+    @apply px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium
+           text-text-primary placeholder:text-text-tertiary
+           focus:border-coral focus:ring-1 focus:ring-coral/20 outline-none transition-all;
+  }
+}
+
+/* Entrance animations */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-6px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(10px); filter: blur(4px); }
+  to { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+
+.animate-fade-up {
+  animation: fadeUp 0.4s ease-out both;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out both;
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out both;
+}
+
+.animate-count-up {
+  animation: countUp 0.5s ease-out both;
+}
+
+/* Stagger delays */
+.delay-1 { animation-delay: 50ms; }
+.delay-2 { animation-delay: 100ms; }
+.delay-3 { animation-delay: 150ms; }
+.delay-4 { animation-delay: 200ms; }
+.delay-5 { animation-delay: 250ms; }
+.delay-6 { animation-delay: 300ms; }
+.delay-7 { animation-delay: 350ms; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-gray-300); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-gray-400); }
+
+/* Search dropdown animation */
+@keyframes fadeSlideDown {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}

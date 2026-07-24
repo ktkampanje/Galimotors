@@ -1,0 +1,512 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============== ADMIN/USERS ================= //
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      String   @default("ADMIN") // SUPER_ADMIN, ADMIN, SELLER, MARKET_ATTENDANT, CUSTOMER
+  createdAt DateTime @default(now())
+
+  // Profiles
+  sellerProfile    Seller?          @relation(name: "UserToSeller")
+  attendantProfile MarketAttendant? @relation(name: "UserToAttendant")
+}
+
+// ============== CUSTOMERS =================== //
+model Customer {
+  id              String   @id @default(uuid())
+  email           String   @unique
+  password        String
+  name            String
+  phone           String?
+  district        String?
+  emailVerified   Boolean  @default(false)
+  isGuestAccount  Boolean  @default(false)  // Auto-created from inquiry
+  accountActivatedAt DateTime?              // When guest activated account
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  recentlyViewed  RecentlyViewed[]
+  favorites       Favorite[]
+  leads           Lead[]    // All inquiries from this customer
+}
+
+// ============== RECENTLY VIEWED ============= //
+model RecentlyViewed {
+  id         String   @id @default(uuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  carId      String
+  viewedAt   DateTime @default(now())
+
+  @@unique([customerId, carId])
+  @@index([customerId, viewedAt])
+}
+
+// ============== FAVORITES =================== //
+model Favorite {
+  id         String   @id @default(uuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  carId      String
+  addedAt    DateTime @default(now())
+
+  @@unique([customerId, carId])
+  @@index([customerId, addedAt])
+}
+
+// ============== MARKETS ===================== //
+model Market {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  district    String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  sellers     Seller[]
+  attendants  MarketAttendant[]
+  cars        Car[]
+}
+
+model MarketAttendant {
+  id          String   @id @default(uuid())
+  name        String
+  phone       String
+  marketId    String
+  market      Market   @relation(fields: [marketId], references: [id], onDelete: Cascade)
+  sellerId    String?
+  seller      Seller?  @relation(fields: [sellerId], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+
+  cars        Car[]
+
+  userId      String?  @unique
+  user        User?    @relation(name: "UserToAttendant", fields: [userId], references: [id], onDelete: SetNull)
+}
+
+// ============== SELLERS ===================== //
+model Seller {
+  id                 String   @id @default(uuid())
+  name               String
+  phone              String
+  email              String?
+  sellerType         String   // DEALER, INDIVIDUAL
+  district           String
+  marketId           String?
+  market             Market?  @relation(fields: [marketId], references: [id], onDelete: SetNull)
+  userId             String?  @unique
+  user               User?    @relation(name: "UserToSeller", fields: [userId], references: [id], onDelete: SetNull)
+  verifiedByPlatform Boolean  @default(false)
+  sellerStatus       String   @default("PENDING") // PENDING, APPROVED, SUSPENDED
+  notes              String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  cars               Car[]
+  attendants         MarketAttendant[]
+}
+
+// ============== DYNAMIC FILTER TABLES ======= //
+model Maker {
+  id       String  @id @default(uuid())
+  name     String  @unique
+  logoUrl  String?
+  
+  models   Model[]
+  cars     Car[]
+}
+
+model Model {
+  id       String  @id @default(uuid())
+  name     String
+  makerId  String
+  maker    Maker   @relation(fields: [makerId], references: [id], onDelete: Cascade)
+  
+  cars     Car[]
+}
+
+model BodyType {
+  id       String  @id @default(uuid())
+  name     String  @unique
+  iconUrl  String?
+  
+  cars     Car[]
+}
+
+model Feature {
+  id       String  @id @default(uuid())
+  name     String  @unique
+
+  cars     CarFeature[]
+}
+
+// ============== CORE INVENTORY =============== //
+model Car {
+  id                     String    @id @default(uuid())
+  
+  // Primary Pricing
+  title                  String
+  basePrice              Float     // Listed price shown to customers
+  // The seller's bottom line — what they take regardless of the final deal.
+  // GaliMotors' margin is (agreed price - sellerAskingPrice), not a fixed
+  // percentage: seller wants 30M, listed 32.5M, customer negotiates 31M ->
+  // seller gets 30M, GaliMotors keeps 1M. INTERNAL: must never reach the
+  // public API (see carController for the stripping logic).
+  sellerAskingPrice      Float?
+  currency               String    @default("MK")
+  negotiable             Boolean   @default(true)
+
+  // Dynamic Specs
+  makerId                String?
+  maker                  Maker?    @relation(fields: [makerId], references: [id])
+  modelId                String?
+  model                  Model?    @relation(fields: [modelId], references: [id])
+  bodyTypeId             String?
+  bodyType               BodyType? @relation(fields: [bodyTypeId], references: [id])
+  year                   Int?
+
+  // Static Specs
+  condition              String?   @default("Used In Malawi") // IT, Brand New, Used In Malawi
+  fuelType               String?   // PETROL, DIESEL, HYBRID, ELECTRIC
+  transmission           String?   // AUTOMATIC, MANUAL
+  mileage                Int?
+  engineSize             String?   // e.g. 2.0L, 1998cc
+  chassisNumber          String?
+  modelCode              String?
+  steering               String?   @default("RIGHT") // RIGHT, LEFT
+  exteriorColor          String?
+  interiorColor          String?
+  seatingCapacity        Int?      @default(5)
+  doors                  Int?      @default(4)
+  driveTrain             String?   @default("2WD") // 2WD, 4WD, AWD
+  
+  // Logistics & Documents
+  district               String
+  fuelConsumptionKmPL    Float?    // Changed from Decimal to Float
+  logbookAvailable       Boolean   @default(false)
+  dutyPaid               Boolean   @default(false)
+  registered             Boolean   @default(false)
+  registrationNumber     String?
+  registrationYear       Int?
+
+  // Trust & Visibility
+  platformInspectedBadge Boolean   @default(false)
+  isFeatured             Boolean   @default(false)
+  urgentSaleBadge        Boolean   @default(false)
+
+  // Status & Reservation
+  status                 String    @default("PENDING_APPROVAL") // AVAILABLE, VIEWING_SCHEDULED, RESERVED, SOLD, HIDDEN, PENDING_APPROVAL
+  soldAt                 DateTime? // Timestamp when car was marked as SOLD
+  reservationFeeRequired Boolean   @default(false)
+  reservationExpiry      DateTime?
+  reservedByLeadId       String?       
+
+  // CRM Tracker
+  sellerId               String
+  seller                 Seller    @relation(fields: [sellerId], references: [id])
+  marketId               String?
+  market                 Market?   @relation(fields: [marketId], references: [id], onDelete: SetNull)
+  attendantId            String?
+  attendant              MarketAttendant? @relation(fields: [attendantId], references: [id], onDelete: SetNull)
+  verifiedByAdmin        Boolean   @default(false)
+  inspectionNotes        String?
+  commissionAmount       Float?    // Changed from Decimal to Float
+  commissionStatus       String    @default("PENDING") // PENDING, PAID
+
+  viewsCount             Int       @default(0)
+  inquiriesCount         Int       @default(0)
+  deletedAt              DateTime? // Soft delete timestamp
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  // Relationships
+  images                 Image[]
+  features               CarFeature[]
+  categories             CarCategory[]
+  leads                  Lead[]
+}
+
+// ============== RELATIONS & IMAGES =========== //
+model Image {
+  id        String   @id @default(uuid())
+  url       String   // Cloudinary URL
+  isPrimary Boolean  @default(false)
+  carId     String
+  car       Car      @relation(fields: [carId], references: [id], onDelete: Cascade)
+}
+
+model CarFeature {
+  carId     String
+  featureId String
+  car       Car     @relation(fields: [carId], references: [id], onDelete: Cascade)
+  feature   Feature @relation(fields: [featureId], references: [id], onDelete: Cascade)
+
+  @@id([carId, featureId])
+}
+
+// ============== CATEGORIES/TAGS =============== //
+model Category {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  emoji       String   @default("•")
+  color       String   @default("#13293D") // Primary color
+  bgColor     String   @default("#E8EEF4") // Light background
+  rankBoost   Int      @default(0) // Search ranking boost
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  cars CarCategory[]
+}
+
+model CarCategory {
+  carId      String
+  categoryId String
+  car        Car      @relation(fields: [carId], references: [id], onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  assignedAt DateTime @default(now())
+  assignedBy String?  // Future: track which admin assigned this
+
+  @@id([carId, categoryId])
+  @@index([categoryId])
+}
+
+// ====== VIEWING LOGISTICS & FINANCE ========== //
+model District {
+  id                    String  @id @default(uuid())
+  name                  String  @unique
+  sortOrder             Int     @default(0)
+  chargeDriverAllowance Boolean @default(true)
+  chargeAccommodation   Boolean @default(true)
+  chargeFuel            Boolean @default(true)
+}
+
+model Distance {
+  id             String @id @default(uuid())
+  fromDistrictId String
+  toDistrictId   String
+  distanceKm     Int
+}
+
+model FuelPrice {
+  id            String   @id @default(uuid())
+  fuelType      String   @unique // PETROL, DIESEL, HYBRID, ELECTRIC
+  pricePerLitre Float    // Changed from Decimal to Float
+  lastUpdated   DateTime @default(now())
+}
+
+model GlobalSettings {
+  id               String  @id @default("SETTINGS_SINGLETON")
+  driverAllowance  Float   // Changed from Decimal to Float
+  accommodationFee Float   // Changed from Decimal to Float
+  adminWhatsApp     String  @default("265990000000")
+  adminPhone        String  @default("265990000000")
+  businessEmail     String  @default("info@galimotors.com")
+  
+  // Payment Methods
+  bankName          String  @default("National Bank of Malawi")
+  bankAccountName   String  @default("GaliMotors Ltd")
+  bankAccountNumber String  @default("100 234 5678")
+  
+  airtelMoneyName   String  @default("")
+  airtelMoneyNumber String  @default("")
+  
+  tnmMpambaName     String  @default("")
+  tnmMpambaNumber   String  @default("")
+
+  // Public identity shown in the dealership footer. Facebook icon renders
+  // only when facebookUrl is non-empty, so an unset value hides it cleanly.
+  facebookUrl       String  @default("")
+  businessAddress   String  @default("Lilongwe, Malawi")
+
+  // Meta (Facebook) Pixel ID from Events Manager. Empty = no tracking
+  // script is loaded at all; set it when ad campaigns go live.
+  metaPixelId       String  @default("")
+}
+
+// ============== EDITABLE STATIC PAGES ============== //
+// Footer/support pages whose copy is edited from the admin panel rather than
+// living in the codebase. `content` uses a markdown-lite syntax parsed to
+// React elements on the client (## heading, ### subheading, - list item,
+// blank line = new paragraph). It is never injected as raw HTML.
+// An owner asking GaliMotors to sell their car ("Sell Your Car" page).
+// Deliberately not a Lead: leads hang off an existing Car record, and here
+// no car exists yet — an admin reviews the request, contacts the owner on
+// WhatsApp, and creates the Car in Inventory if it is taken on.
+model SellRequest {
+  id            String   @id @default(uuid())
+  name          String
+  phone         String   // Local 0XXXXXXXXX form, same as lead phones
+  district      String?
+  carDetails    String   // Free text: make, model, year, condition, mileage…
+  expectedPrice Float?   // What the owner hopes to get (their bottom line)
+  status        String   @default("NEW") // NEW, CONTACTED, LISTED, DECLINED
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// Photos behind the homepage hero headline. Admin-curated so the band shows
+// hand-picked, good-looking cars; when none are set the frontend falls back
+// to inventory primary images so the band never renders bare.
+model HeroImage {
+  id        String   @id @default(uuid())
+  url       String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+model StaticPage {
+  id        String   @id @default(uuid())
+  slug      String   @unique
+  title     String
+  subtitle  String?
+  content   String
+  updatedAt DateTime @updatedAt
+}
+
+// ============== FILTER STATISTICS CACHE ============= //
+model FilterStatsCache {
+  id        String   @id @default("STATS_SINGLETON")
+  stats     String   // JSON string of all filter statistics
+  updatedAt DateTime @default(now())
+}
+
+// ============== ACTIVITY LOG & AUDIT TRAIL ============= //
+model ActivityLog {
+  id         String   @id @default(uuid())
+  userId     String?  // Admin user who performed the action
+  action     String   // CREATE, UPDATE, DELETE, LOGIN, etc.
+  entityType String   // Car, Lead, User, etc.
+  entityId   String?  // ID of the affected entity
+  oldValue   String?  // JSON string of old values
+  newValue   String?  // JSON string of new values
+  ipAddress  String?  // IP address of the user
+  userAgent  String?  // Browser/device info
+  createdAt  DateTime @default(now())
+}
+
+// ============== LEADS & PAYMENTS ============= //
+model Lead {
+  id                   String        @id @default(uuid())
+  referenceNumber      String        @unique @default(cuid()) // LQ12345 format
+  carId                String
+  car                  Car           @relation(fields: [carId], references: [id], onDelete: Cascade)
+  
+  // Optional Customer Link (if inquiry from authenticated user)
+  customerId           String?
+  customer             Customer?     @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  
+  // Buyer Info
+  buyerName            String
+  buyerPhone           String  // RegEx validated format e.g., 099...
+  buyerEmail           String?
+  message              String?
+  // Internal, admin-only. Kept separate from `message` (the customer's own
+  // words) — notes used to be appended there, which corrupted the customer's
+  // inquiry and made staff remarks appear as customer speech in the thread.
+  adminNotes           String?
+
+  type                 String        @default("INQUIRY") // INQUIRY, PAID_VIEWING_REQUEST, PAID_RESERVATION
+  status               String        @default("NEW") // NEW, QUOTE_SENT, QUOTE_ACCEPTED, CONTACTED, VIEWING_SCHEDULED, NEGOTIATION, CLOSED_WON, CLOSED_LOST
+  leadSource           String?       // Track where lead came from (homepage, listings, featured, etc.)
+
+  // Quote Management (NEW)
+  adminResponse        String?       // Admin's quote message
+  quotedPrice          Float?        // Admin's custom quoted price
+  paymentTerms         String?       // Payment instructions (e.g., "50% deposit")
+  quoteSentAt          DateTime?     // When admin sent the quote
+  customerViewedAt     DateTime?     // When customer viewed the quote
+  quoteExpiresAt       DateTime?     // Quote expiration date (optional)
+
+  // Negotiation & Counter-Offers
+  negotiationHistory   NegotiationOffer[] @relation("LeadNegotiations") // Track all counter-offers
+  lastCounterOfferPrice Float?       // Last counter-offer price from customer
+  lastCounterOfferTerms String?      // Last counter-offer terms from customer
+  lastCounterOfferAt   DateTime?     // When last counter-offer was made
+  adminResponseToCounterOffer String? // Admin's response to counter-offer
+  negotiationStatus    String?       // ACTIVE, ON_HOLD, ACCEPTED, REJECTED
+
+  // Viewing Conversation (NEW)
+  viewingMessages      ViewingMessage[] @relation("LeadViewingMessages")
+
+  // Paid Workflows (Viewing Requests / Reservations)
+  buyerDistrict        String?
+  carDistrict          String?
+  roundTripDistanceKm  Int?
+  calculatedTotalCost  Float?        // Changed from Decimal to Float
+  proofOfPaymentUrl    String?
+  paymentStatus        String?       // PENDING_VERIFICATION, VERIFIED, REJECTED
+  paymentAmount        Float?        // Calculated viewing/reservation fee
+  paymentVerifiedBy    String?       // Admin user ID who verified
+  paymentVerifiedAt    DateTime?     // Timestamp of verification
+  paymentRejectionReason String?     // Reason for rejection
+  paymentRefundStatus  String?       // NOT_REQUIRED, PENDING, COMPLETED
+  paymentRefundDate    DateTime?     // Refund completion date
+
+  // Tracking
+  ipAddress            String?       // Customer's IP address
+  userAgent            String?       // Customer's browser/device info
+
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+}
+
+// ============== NEGOTIATION & COUNTER-OFFERS ============= //
+model NegotiationOffer {
+  id                   String   @id @default(uuid())
+  leadId               String
+  lead                 Lead     @relation("LeadNegotiations", fields: [leadId], references: [id], onDelete: Cascade)
+  
+  // Offer Details
+  type                 String   // ADMIN_QUOTE, CUSTOMER_COUNTER, ADMIN_COUNTER_RESPONSE
+  senderName           String?  // Who made it — admin name or buyer name (multi-admin attribution)
+  offeredPrice         Float?   // Price in this offer
+  proposedTerms        String?  // Payment terms or conditions
+  message              String?  // Offer message/notes
+  
+  // Status
+  status               String   @default("PENDING") // PENDING, ACCEPTED, REJECTED, EXPIRED
+  
+  // Tracking
+  createdAt            DateTime @default(now())
+  respondedAt          DateTime? // When this offer was responded to
+  
+  @@index([leadId])
+}
+
+// ============== VIEWING CONVERSATION ============= //
+model ViewingMessage {
+  id        String   @id @default(uuid())
+  leadId    String
+  lead      Lead     @relation("LeadViewingMessages", fields: [leadId], references: [id], onDelete: Cascade)
+  
+  type      String   // CUSTOMER_REQUEST, ADMIN_COST_QUOTE, CUSTOMER_PAYMENT, ADMIN_PAYMENT_VERIFIED, ADMIN_PAYMENT_REJECTED, ADMIN_VIEWING_SCHEDULED, CUSTOMER_MESSAGE, ADMIN_MESSAGE
+  sender    String   // "customer" | "admin"
+  // Display name of who wrote it — the admin's name for admin messages, the
+  // buyer's for customer ones. Several admins can work one lead; without this
+  // a colleague reading the thread cannot tell who said what.
+  senderName String?
+  message   String?
+  
+  // Viewing-specific fields
+  costBreakdown  String?  // JSON: { fuelCost, driverAllowance, accommodation, totalCost }
+  scheduledDate  String?  // Proposed viewing date
+  scheduledTime  String?  // Proposed viewing time
+  scheduledLocation String? // Viewing location
+  
+  createdAt DateTime @default(now())
+  
+  @@index([leadId])
+}

@@ -1,0 +1,52 @@
+{
+  "name": "galimotors-monorepo",
+  "private": true,
+  "workspaces": [
+    "admin-panel",
+    "dealership-app"
+  ],
+  "scripts": {
+    "dev:admin": "npm run dev --workspace=admin-panel",
+    "dev:app": "npm run dev --workspace=dealership-app",
+    "dev:server": "nodemon src/index.ts",
+    "dev": "concurrently --restart-tries 3 --names server,admin,app -c blue,green,yellow \"npm:dev:server\" \"npm:dev:admin\" \"npm:dev:app\"",
+    "build:admin": "npm run build --workspace=admin-panel",
+    "build:app": "npm run build --workspace=dealership-app",
+    "build:server": "tsc",
+    "build": "npm run build:server && npm run build:admin && npm run build:app",
+    "start": "node dist/index.js",
+    "vercel-build": "npx prisma generate && npm run build:server",
+    "postinstall": "npx prisma generate",
+    "db:backup": "ts-node src/scripts/backupDb.ts",
+    "db:push": "npm run db:backup && npx prisma db push",
+    "admin": "ts-node src/scripts/adminAccounts.ts",
+    "data:export": "ts-node src/scripts/exportData.ts",
+    "data:import": "ts-node src/scripts/importData.ts",
+    "db:seed": "node prisma/seed.js",
+    "db:setup": "npm run db:push && npm run db:seed"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "bcryptjs": "^3.0.3",
+    "cloudinary": "^2.10.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.x",
+    "express": "^4.18.2",
+    "express-rate-limit": "^8.3.1",
+    "jsonwebtoken": "^9.0.3",
+    "node-cron": "^4.2.1",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^20.x",
+    "concurrently": "^8.2.2",
+    "nodemon": "^3.0.x",
+    "prisma": "^5.x",
+    "ts-node": "^10.9.x",
+    "typescript": "^5.3.x"
+  }
+}

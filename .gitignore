@@ -1,0 +1,136 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+*.env
+!.env.example
+
+# Build outputs
+dist/
+.next/
+out/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+
+# Testing
+coverage/
+.nyc_output/
+*.test.js
+*.spec.js
+
+# Temporary files
+*.tmp
+*.temp
+temp_*
+*_temp.*
+scratch/
+temp/
+
+# Backup files
+*.backup
+*.bak
+*_BACKUP.*
+*_ORIGINAL.*
+backups/
+prisma/dev.db-wal
+prisma/dev.db-shm
+
+# Documentation drafts (keep only essential docs)
+*_SUMMARY.md
+*_COMPLETE.md
+*_FIXED.md
+*_IMPLEMENTED.md
+*_STATUS.md
+*_DEBUG.md
+*_TROUBLESHOOTING.md
+SESSION_*.md
+CURRENT_*.md
+DO_THIS_NOW.md
+URGENT_*.txt
+TEST_NOW.txt
+READY_TO_TEST.md
+
+# Test files in root
+test-*.js
+test-*.html
+check-*.js
+*.test.html
+debug-*.html
+
+# Script outputs
+diff.patch
+*.patch
+
+# Credentials (keep example only)
+ADMIN_CREDENTIALS.txt
+*_CREDENTIALS.txt
+
+# Batch files
+*.bat
+
+# PowerShell scripts in root
+verify-*.ps1
+*.ps1
+
+# Text notes
+*.txt
+!README.txt
+
+# Car assets (not needed in git, use Cloudinary)
+Car Body Types/
+Car logos/
+
+# Prisma
+prisma/migrations/
+!prisma/schema.prisma
+!prisma/seed.js
+
+# The database itself NEVER goes in git — it holds real customer names and
+# phone numbers, and git is not a backup (use `npm run db:backup`, or the
+# provider's backups on Neon).
+prisma/*.db
+prisma/*.db-wal
+prisma/*.db-shm
+prisma/dev.db.backup-*
+*.sqlite
+*.sqlite3
+
+# Pre-change working copies of source trees
+**/.backup-pre-*
+
+# Full-database exports (npm run data:export) — these carry real customer
+# names and phone numbers. Used to migrate data to Neon; never commit them.
+data-export*.json
+
+# Vercel
+.vercel
+.vercel/
+
+# TypeScript
+*.tsbuildinfo
+
+# Misc
+.DS_Store
+*.pem

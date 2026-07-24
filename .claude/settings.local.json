@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(npx tsc --noEmit)",
+      "PowerShell(npm run build:app)",
+      "PowerShell(git checkout -- prisma/dev.db)",
+      "PowerShell($c = Get-NetTCPConnection -LocalPort 5000 -State Listen -ErrorAction SilentlyContinue; if \\($c\\) { $c | Select-Object -First 1 LocalPort, OwningProcess; Get-Process -Id $c[0].OwningProcess | Select-Object Id, ProcessName, Path } else { 'port 5000 free' })",
+      "PowerShell(Get-Process -Id 11476 | Select-Object Id, ProcessName, Path; try { \\(Invoke-WebRequest -Uri 'http://localhost:5000/api/settings/global' -UseBasicParsing -TimeoutSec 5\\).Content.Substring\\(0, 300\\) } catch { \"API check failed: $\\($_.Exception.Message\\)\" })"
+    ]
+  }
+}

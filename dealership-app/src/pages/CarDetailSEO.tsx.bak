@@ -1,0 +1,712 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
+import { Eye, Calendar, MapPin, Gauge, Fuel, ChevronLeft, ChevronRight, MessageSquare, Phone, ShieldCheck, Check, Zap, X } from 'lucide-react';
+import { api } from '../lib/api';
+import { generateCanonicalUrl, generateMetaDescription, generateOpenGraphData, generateCarJsonLD, generateBreadcrumbs, generateCarUrl } from '../lib/seoRoutes';
+import contactService from '../lib/contactService';
+import recentlyViewedService from '../lib/recentlyViewedService';
+import customerAuthService from '../lib/customerAuthService';
+
+interface Car {
+  id: string;
+  title: string;
+  basePrice: number;
+  year: number;
+  mileage: number;
+  fuelType: string;
+  transmission: string;
+  locationCity: string;
+  status: string;
+  logbookAvailable: boolean;
+  dutyPaid: boolean;
+  registered: boolean;
+  platformInspectedBadge: boolean;
+  urgentSaleBadge: boolean;
+  isFeatured: boolean;
+  viewsCount: number;
+  inquiriesCount: number;
+  fuelConsumptionKmPL?: number;
+  engineSize?: string;
+  driveTrain?: string;
+  steering?: string;
+  exteriorColor?: string;
+  interiorColor?: string;
+  seatingCapacity?: number;
+  doors?: number;
+  chassisNumber?: string;
+  makerId?: string;
+  bodyTypeId?: string;
+  createdAt: string;
+  maker?: { name: string };
+  model?: { name: string };
+  bodyType?: { name: string };
+  images: Array<{ url: string; isPrimary: boolean }>;
+  features?: Array<{ feature: { name: string } }>;
+  seller: { name: string; location: string; verifiedByPlatform: boolean };
+}
+
+interface SimilarCar extends Car {
+  similarityScore: number;
+}
+
+interface SimilarCarsResponse {
+  similarCars: SimilarCar[];
+  basedOn: {
+    maker: string;
+    model: string;
+    bodyType: string;
+    priceRange: { min: number; max: number };
+    yearRange: { min: number; max: number };
+  };
+  totalFound: number;
+}
+
+const CarDetailSEO: React.FC = () => {
+  const { makerSlug, modelSlug, uuidShort } = useParams<{
+    makerSlug: string;
+    modelSlug: string;
+    uuidShort: string;
+  }>();
+
+  const navigate = useNavigate();
+  const [car, setCar] = useState<Car | null>(null);
+  const [similarCars, setSimilarCars] = useState<SimilarCarsResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [similarCarsLoading, setSimilarCarsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+
+  // Inquiry form
+  const [inquiryForm, setInquiryForm] = useState({ name: '', phone: '', message: '' });
+  const [inquiryStatus, setInquiryStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+  const [showInquiryForm, setShowInquiryForm] = useState(false);
+
+  useEffect(() => {
+    if (uuidShort) fetchCarByUuid(uuidShort);
+  }, [uuidShort]);
+
+  useEffect(() => {
+    if (car) fetchSimilarCars(car.id);
+  }, [car]);
+
+  const fetchCarByUuid = async (uuid: string) => {
+    try {
+      setLoading(true);
+      const response = await api.get(`/cars?search=${uuid}&limit=1`);
+      if (response.data.cars && response.data.cars.length > 0) {
+        const foundCar = response.data.cars[0];
+        setCar(foundCar);
+        
+        // Track recently viewed (only for authenticated users)
+        if (customerAuthService.isAuthenticated()) {
+          try {
+            await recentlyViewedService.trackView(foundCar.id);
+          } catch (error) {
+            console.error('Failed to track view:', error);
+          }
+        }
+        
+        const expectedMakerSlug = foundCar.maker?.name?.toLowerCase().replace(/[^a-z0-9]/g, '-') || 'unknown';
+        const expectedModelSlug = foundCar.model?.name?.toLowerCase().replace(/[^a-z0-9]/g, '-') || 'unknown';
+        if (makerSlug !== expectedMakerSlug || modelSlug !== expectedModelSlug) {
+          navigate(`/cars/${expectedMakerSlug}/${expectedModelSlug}/${uuid}`, { replace: true });
+          return;
+        }
+      } else {
+        setError('Car not found');
+      }
+    } catch (err) {
+      console.error('Failed to fetch car:', err);
+      setError('Failed to load car details');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchSimilarCars = async (carId: string) => {
+    try {
+      setSimilarCarsLoading(true);
+      const response = await api.get(`/cars/${carId}/similar?limit=6`);
+      setSimilarCars(response.data);
+    } catch (err) {
+      console.error('Failed to fetch similar cars:', err);
+    } finally {
+      setSimilarCarsLoading(false);
+    }
+  };
+
+  const handleInquirySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!car) return;
+    setInquiryStatus('submitting');
+    try {
+      await api.post('/leads', {
+        carId: car.id,
+        buyerName: inquiryForm.name,
+        buyerPhone: inquiryForm.phone,
+        message: inquiryForm.message,
+        type: 'INQUIRY',
+        leadSource: 'car_detail_page'
+      });
+      setInquiryStatus('success');
+      setInquiryForm({ name: '', phone: '', message: '' });
+    } catch (err) {
+      console.error('Failed to submit inquiry:', err);
+      setInquiryStatus('error');
+    }
+  };
+
+  const handleWhatsAppContact = () => {
+    if (!car) return;
+    contactService.contactAboutCar(car, 'inquiry');
+  };
+
+  const nextImage = useCallback(() => {
+    if (!car) return;
+    setCurrentImageIndex(prev => (prev + 1) % car.images.length);
+  }, [car]);
+
+  const prevImage = useCallback(() => {
+    if (!car) return;
+    setCurrentImageIndex(prev => (prev - 1 + car.images.length) % car.images.length);
+  }, [car]);
+
+  // Keyboard nav for lightbox
+  useEffect(() => {
+    if (!lightboxOpen) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight') nextImage();
+      else if (e.key === 'ArrowLeft') prevImage();
+      else if (e.key === 'Escape') setLightboxOpen(false);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [lightboxOpen, nextImage, prevImage]);
+
+  const fmt = (n: number) => `MK ${n.toLocaleString()}`;
+
+  // ── Loading ──
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white">
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          <div className="animate-pulse space-y-6">
+            <div className="h-4 bg-pharmacore-gray w-1/3" />
+            <div className="flex flex-col lg:flex-row gap-6">
+              <div className="flex-1 space-y-3">
+                <div className="aspect-[16/10] bg-pharmacore-gray" />
+                <div className="grid grid-cols-6 gap-2">
+                  {[...Array(6)].map((_, i) => <div key={i} className="aspect-square bg-pharmacore-gray" />)}
+                </div>
+              </div>
+              <div className="w-full lg:w-80 space-y-4">
+                <div className="h-8 bg-pharmacore-gray" />
+                <div className="h-6 bg-pharmacore-gray w-1/2" />
+                <div className="h-12 bg-pharmacore-gray" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Error ──
+  if (error || !car) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-black uppercase text-dark mb-4">Car Not Found</h1>
+          <p className="text-brand-medium mb-6">{error || 'The car you are looking for does not exist.'}</p>
+          <button onClick={() => navigate('/cars')} className="btn-primary px-6 py-3 font-black uppercase tracking-wider">
+            Browse Cars
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const imgs = car.images || [];
+  const canonicalUrl = generateCanonicalUrl(car);
+  const metaDescription = generateMetaDescription(car);
+  const openGraphData = generateOpenGraphData(car);
+  const jsonLD = generateCarJsonLD(car);
+  const breadcrumbs = generateBreadcrumbs(car);
+
+  return (
+    <>
+      <Helmet>
+        <title>{car.title} - GaliMotors</title>
+        <meta name="description" content={metaDescription} />
+        <link rel="canonical" href={canonicalUrl} />
+        <meta property="og:title" content={openGraphData.title} />
+        <meta property="og:description" content={openGraphData.description} />
+        <meta property="og:url" content={openGraphData.url} />
+        <meta property="og:type" content={openGraphData.type} />
+        <meta property="og:image" content={openGraphData.image} />
+        <meta property="og:site_name" content={openGraphData.siteName} />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={openGraphData.title} />
+        <meta name="twitter:description" content={openGraphData.description} />
+        <meta name="twitter:image" content={openGraphData.image} />
+        <script type="application/ld+json">{JSON.stringify(jsonLD)}</script>
+      </Helmet>
+
+      {/* ── Fullscreen Lightbox ── */}
+      {lightboxOpen && (
+        <div className="fixed inset-0 z-[9999] bg-dark/95 flex items-center justify-center" onClick={() => setLightboxOpen(false)}>
+          <button onClick={(e) => { e.stopPropagation(); setLightboxOpen(false); }} className="absolute top-4 right-4 text-white/70 hover:text-white z-10">
+            <X size={28} />
+          </button>
+          <button onClick={(e) => { e.stopPropagation(); prevImage(); }} className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors">
+            <ChevronLeft size={24} />
+          </button>
+          <img
+            src={imgs[currentImageIndex]?.url}
+            alt={car.title}
+            className="max-h-[85vh] max-w-[90vw] object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+          <button onClick={(e) => { e.stopPropagation(); nextImage(); }} className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors">
+            <ChevronRight size={24} />
+          </button>
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-white/60 text-xs font-bold tracking-widest uppercase">
+            {currentImageIndex + 1} / {imgs.length} Photos
+          </div>
+        </div>
+      )}
+
+      <div className="min-h-screen bg-white">
+        {/* ── Breadcrumb ── */}
+        <div className="py-4">
+          <div className="max-w-7xl mx-auto px-4 lg:px-6">
+            <nav className="flex items-center gap-2 text-xs font-medium text-gray-500">
+              {breadcrumbs.map((crumb, i) => (
+                <React.Fragment key={i}>
+                  {i > 0 && <span className="text-gray-300">/</span>}
+                  <a
+                    href={crumb.url}
+                    className={`uppercase tracking-wide no-underline transition-colors ${
+                      i === breadcrumbs.length - 1 ? 'text-dark font-bold' : 'hover:text-coral'
+                    }`}
+                  >
+                    {crumb.name}
+                  </a>
+                </React.Fragment>
+              ))}
+            </nav>
+          </div>
+        </div>
+
+        <div className="max-w-7xl mx-auto px-4 lg:px-6 py-6 pb-16">
+          <div className="flex flex-col lg:flex-row gap-10 items-start">
+
+            {/* ═══════════════════════════════════════════
+                LEFT COLUMN: Focus on Data & Photos
+            ═══════════════════════════════════════════ */}
+            <div className="flex-1 min-w-0">
+
+              {/* ── Photo Gallery ── */}
+              <div>
+                {/* Main Image */}
+                <div
+                  className="relative aspect-[16/10] bg-gray-100 overflow-hidden cursor-pointer"
+                  onClick={() => setLightboxOpen(true)}
+                >
+                  {imgs.length > 0 ? (
+                    <img
+                      src={imgs[currentImageIndex]?.url}
+                      alt={`${car.title} - Photo ${currentImageIndex + 1}`}
+                      className="w-full h-full object-contain"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-400 font-medium text-sm">No image available</div>
+                  )}
+
+                  {/* Overlay badges */}
+                  <div className="absolute top-3 left-3 flex flex-col gap-2 z-10">
+                    {car.platformInspectedBadge && (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-dark text-white text-xs font-semibold rounded-sm shadow-sm">
+                        <ShieldCheck size={14} /> Verified
+                      </span>
+                    )}
+                    {car.urgentSaleBadge && (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-coral text-white text-xs font-semibold rounded-sm shadow-sm">
+                        <Zap size={14} /> Urgent Sale
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Photo counter */}
+                  <div className="absolute bottom-3 right-3 bg-dark/80 text-white px-3 py-1.5 text-xs font-medium rounded-sm">
+                    {currentImageIndex + 1} / {imgs.length}
+                  </div>
+
+                  {/* Prev / Next arrows */}
+                  {imgs.length > 1 && (
+                    <>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); prevImage(); }}
+                        className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/80 hover:bg-white text-dark flex items-center justify-center rounded-full shadow-md transition-colors"
+                      >
+                        <ChevronLeft size={24} />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); nextImage(); }}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/80 hover:bg-white text-dark flex items-center justify-center rounded-full shadow-md transition-colors"
+                      >
+                        <ChevronRight size={24} />
+                      </button>
+                    </>
+                  )}
+                </div>
+
+                {/* Thumbnail strip */}
+                {imgs.length > 1 && (
+                  <div className="py-4 overflow-x-auto">
+                    <div className="flex gap-2" style={{ minWidth: 'min-content' }}>
+                      {imgs.map((img, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => setCurrentImageIndex(idx)}
+                          className={`w-[100px] aspect-[4/3] shrink-0 overflow-hidden transition-all ${
+                            idx === currentImageIndex
+                              ? 'ring-2 ring-coral ring-offset-2'
+                              : 'opacity-70 hover:opacity-100'
+                          }`}
+                        >
+                          <img src={img.url} className="w-full h-full object-cover bg-gray-50" alt="" loading="lazy" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ── Mobile: Title + Price ── */}
+              <div className="p-4 lg:hidden border-b border-gray-200">
+                <h1 className="text-xl font-bold text-dark mb-1">{car.title}</h1>
+                <p className="text-sm text-gray-600 mb-4">
+                  {car.maker?.name} {car.model?.name} • Year {car.year}
+                </p>
+                <div className="bg-gray-50 border border-gray-200 p-3 rounded-md">
+                  <p className="text-xs text-gray-500 font-medium mb-1">Price</p>
+                  <p className="text-2xl font-bold text-coral">{fmt(car.basePrice)}</p>
+                </div>
+              </div>
+
+              {/* ── Specifications Data ── */}
+              <div className="py-8 border-t border-gray-100 mt-6 lg:mt-0">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-black uppercase text-dark tracking-wide">Vehicle Specifications</h2>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-0 border border-gray-200 rounded-sm overflow-hidden">
+                  {[
+                    { label: 'Make', value: car.maker?.name || 'N/A' },
+                    { label: 'Model', value: car.model?.name || 'N/A' },
+                    { label: 'Year', value: car.year },
+                    { label: 'Mileage', value: `${car.mileage?.toLocaleString() || '—'} km` },
+                    { label: 'Engine', value: car.engineSize || 'N/A' },
+                    { label: 'Fuel', value: car.fuelType || 'N/A' },
+                    { label: 'Transmission', value: car.transmission || 'N/A' },
+                    { label: 'Drive Train', value: car.driveTrain || 'N/A' },
+                    { label: 'Body Type', value: car.bodyType?.name || 'N/A' },
+                    { label: 'Steering', value: car.steering || 'RHD' },
+                    { label: 'Seats / Doors', value: `${car.seatingCapacity || '?'} / ${car.doors || '?'}` },
+                    { label: 'Ref No.', value: car.chassisNumber || car.id.substring(0,8) },
+                  ].map((row, i) => (
+                    <div key={i} className="flex flex-col p-4 border-b border-gray-200 border-r last:border-r-0 md:last:border-r-0">
+                      <span className="text-xs text-gray-500 font-semibold uppercase tracking-widest mb-1">{row.label}</span>
+                      <span className="text-sm font-bold text-dark">{row.value}</span>
+                    </div>
+                  ))}
+                  <div className="flex flex-col p-4 border-b border-gray-200 border-r last:border-r-0 md:last:border-r-0">
+                    <span className="text-xs text-gray-500 font-semibold uppercase tracking-widest mb-1">Duty Status</span>
+                    <span className={`text-sm font-bold ${car.dutyPaid ? 'text-coral' : 'text-dark'}`}>{car.dutyPaid ? 'Duty Paid' : 'Uncleared'}</span>
+                  </div>
+                  <div className="flex flex-col p-4 border-b border-gray-200 border-r last:border-r-0 md:last:border-r-0">
+                    <span className="text-xs text-gray-500 font-semibold uppercase tracking-widest mb-1">Logbook</span>
+                    <span className={`text-sm font-bold ${car.logbookAvailable ? 'text-coral' : 'text-dark'}`}>{car.logbookAvailable ? 'On Hand' : 'Pending'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Features ── */}
+              {car.features && car.features.length > 0 && (
+                <div className="py-6 border-t border-gray-100">
+                  <h3 className="text-lg font-black uppercase text-dark mb-4">Features</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {car.features.map((f, idx) => (
+                      <div key={idx} className="flex items-center gap-2 text-sm text-dark font-medium">
+                        <Check size={16} className="text-coral shrink-0" />
+                        <span>{f.feature.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ── Broker's Notes ── */}
+              <div className="py-8 border-t border-gray-100">
+                <div className="flex items-center gap-2 mb-4">
+                  <ShieldCheck size={20} className="text-coral" />
+                  <h3 className="text-lg font-black uppercase tracking-wide text-dark">Broker's Condition Notes</h3>
+                </div>
+                <div className="text-base text-gray-700 leading-relaxed font-medium space-y-4 max-w-4xl">
+                  <p>
+                    This {car.year} {car.maker?.name} {car.model?.name} has been fully inspected by our brokerage team and meets
+                    all GaliMotors standards. The vehicle is in excellent mechanical condition with a clean engine bay and smooth
+                    {car.transmission?.toLowerCase() === 'automatic' ? ' automatic' : ' manual'} transmission.
+                  </p>
+                  <p>
+                    {car.interiorColor ? `The interior (${car.interiorColor}) is remarkably well kept.` : 'The interior is remarkably well kept.'}{' '}
+                    All electronics are functioning perfectly.{' '}
+                    {car.dutyPaid
+                      ? 'Duty has been fully paid — no hidden MRA fees.'
+                      : 'Please note duty is uncleared; our clearing agents can assist with the entire process.'}{' '}
+                    A highly recommended unit for anyone looking for a reliable {car.bodyType?.name || 'vehicle'}.
+                  </p>
+                </div>
+              </div>
+
+              {/* ── Mobile CTAs ── */}
+              <div className="lg:hidden mt-6 flex flex-col gap-3">
+                <button
+                  onClick={() => setShowInquiryForm(!showInquiryForm)}
+                  className="w-full bg-dark text-white py-4 px-4 text-sm font-bold uppercase tracking-wider flex items-center justify-center gap-2"
+                >
+                  Request Inspection
+                </button>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={handleWhatsAppContact}
+                    className="flex justify-center items-center gap-2 py-4 px-4 text-sm font-bold border border-gray-300 text-dark uppercase tracking-wider"
+                  >
+                    WhatsApp
+                  </button>
+                  <a
+                    href="tel:+265990000000"
+                    className="flex justify-center items-center gap-2 py-4 px-4 text-sm font-bold border border-gray-300 text-dark uppercase tracking-wider no-underline"
+                  >
+                    Call Broker
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            {/* ═══════════════════════════════════════════
+                RIGHT COLUMN: Professional Purchasing Sidebar
+            ═══════════════════════════════════════════ */}
+            <aside className="w-full lg:w-[380px] shrink-0 flex flex-col gap-6 lg:sticky lg:top-24 hidden lg:flex mt-10 lg:mt-0">
+              <div className="flex flex-col gap-4">
+                
+                {/* Header Information */}
+                <div>
+                  <h1 className="text-3xl font-black uppercase text-dark leading-tight mb-2">{car.title}</h1>
+                  <p className="text-sm font-bold text-gray-500 uppercase tracking-widest">
+                    {car.year} • {car.mileage?.toLocaleString()} km
+                  </p>
+                </div>
+
+                <div className="h-px w-full bg-gray-200 my-2"></div>
+
+                {/* Pricing */}
+                <div>
+                  <p className="text-xs text-brand-medium font-bold uppercase tracking-wide mb-1">Total Vehicle Price</p>
+                  <p className="text-4xl font-black text-dark">{fmt(car.basePrice)}</p>
+                </div>
+
+                <div className="h-px w-full bg-gray-200 my-2"></div>
+
+                {/* Badges */}
+                <div className="space-y-3 mb-4">
+                  {car.dutyPaid && (
+                    <div className="flex items-center gap-3 text-dark">
+                      <Check size={18} className="text-coral shrink-0" />
+                      <span className="text-sm font-bold">Duty Paid / Cleared</span>
+                    </div>
+                  )}
+                  {car.platformInspectedBadge && (
+                    <div className="flex items-center gap-3 text-dark">
+                      <ShieldCheck size={18} className="text-coral shrink-0" />
+                      <span className="text-sm font-bold">100-Point Inspected</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* CTAs */}
+                {!showInquiryForm && inquiryStatus !== 'success' && (
+                  <div className="flex flex-col gap-3">
+                    <button
+                      onClick={() => setShowInquiryForm(true)}
+                      className="w-full bg-dark text-white py-4 text-sm font-bold uppercase tracking-wider hover:bg-black transition-colors"
+                    >
+                      Request Inspection
+                    </button>
+                    <button
+                      onClick={handleWhatsAppContact}
+                      className="w-full border border-gray-300 text-dark bg-white hover:border-dark py-4 text-sm font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2"
+                    >
+                      <MessageSquare size={18} /> Inquire via WhatsApp
+                    </button>
+                  </div>
+                )}
+
+                {/* Inquiry Form */}
+                {inquiryStatus === 'success' ? (
+                  <div className="text-center py-6">
+                    <div className="w-12 h-12 bg-coral text-white rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Check size={24} />
+                    </div>
+                    <h4 className="text-lg font-black uppercase text-dark mb-2">Inquiry Sent</h4>
+                    <p className="text-sm text-gray-500 mb-6">Our broker team will contact you shortly.</p>
+                    <button
+                      onClick={handleWhatsAppContact}
+                      className="w-full py-4 border border-gray-300 text-dark font-bold uppercase tracking-wider flex items-center justify-center gap-2 hover:border-dark transition-colors"
+                    >
+                      <MessageSquare size={16} /> Continue on WhatsApp
+                    </button>
+                  </div>
+                ) : showInquiryForm ? (
+                  <div className="pt-2 animate-in slide-in-from-top-4 duration-300">
+                    <h4 className="text-sm font-bold uppercase text-dark mb-4 tracking-wider">Contact GaliMotors</h4>
+                    <form onSubmit={handleInquirySubmit} className="space-y-4">
+                      {inquiryStatus === 'error' && (
+                        <div className="text-sm font-bold text-coral">Transmission error. Please try again.</div>
+                      )}
+                      <input
+                        type="text"
+                        required
+                        placeholder="Your Full Name"
+                        className="w-full border-b border-gray-300 py-3 text-sm outline-none focus:border-dark bg-transparent"
+                        value={inquiryForm.name}
+                        onChange={e => setInquiryForm(p => ({ ...p, name: e.target.value }))}
+                      />
+                      <input
+                        type="tel"
+                        required
+                        placeholder="Phone Number"
+                        className="w-full border-b border-gray-300 py-3 text-sm outline-none focus:border-dark bg-transparent"
+                        value={inquiryForm.phone}
+                        onChange={e => setInquiryForm(p => ({ ...p, phone: e.target.value }))}
+                      />
+                      <textarea
+                        placeholder="Message (optional)"
+                        rows={2}
+                        className="w-full border-b border-gray-300 py-3 text-sm outline-none focus:border-dark bg-transparent resize-none"
+                        value={inquiryForm.message}
+                        onChange={e => setInquiryForm(p => ({ ...p, message: e.target.value }))}
+                      />
+                      <div className="flex flex-col gap-2 pt-4">
+                        <button
+                          type="submit"
+                          disabled={inquiryStatus === 'submitting'}
+                          className="w-full py-4 bg-coral text-white font-bold uppercase tracking-wider transition-colors hover:bg-dark disabled:opacity-50"
+                        >
+                          {inquiryStatus === 'submitting' ? 'Sending...' : 'Submit Inquiry'}
+                        </button>
+                        <button
+                          type="button"
+                          className="w-full py-3 text-xs font-bold text-gray-500 uppercase tracking-widest hover:text-dark"
+                          onClick={() => setShowInquiryForm(false)}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                ) : null}
+
+                {/* Meta details */}
+                <div className="pt-6 mt-4 border-t border-gray-200 flex items-center gap-6 text-sm text-gray-400 font-medium">
+                  <div className="flex items-center gap-1.5">
+                    <Eye size={16} />
+                    <span>{car.viewsCount || 0} views</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <MessageSquare size={16} />
+                    <span>{car.inquiriesCount || 0} inquiries</span>
+                  </div>
+                </div>
+              </div>
+            </aside>
+          </div>
+
+          {/* ═══════════════════════════════════════════
+              SIMILAR CARS
+          ═══════════════════════════════════════════ */}
+          {similarCars && similarCars.similarCars.length > 0 && (
+            <div className="mt-16 pb-10 border-t border-gray-200 pt-16">
+              <div className="mb-10 text-center">
+                <h2 className="text-3xl font-black uppercase tracking-tighter text-dark mb-2">Similar Cars You Might Like</h2>
+                <p className="text-gray-500 font-bold tracking-wide">
+                  Based on {similarCars.basedOn.maker} and similar specifications
+                </p>
+              </div>
+
+              {similarCarsLoading ? (
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                  {[1, 2, 3, 4].map(i => (
+                    <div key={i} className="animate-pulse">
+                      <div className="aspect-[4/3] bg-gray-200 mb-4" />
+                      <div className="h-4 bg-gray-200 w-3/4 mb-2" />
+                      <div className="h-4 bg-gray-200 w-1/2" />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  {similarCars.similarCars.map((sc) => (
+                    <Link
+                      key={sc.id}
+                      to={generateCarUrl(sc)}
+                      className="group bg-white border border-gray-200 hover:border-dark hover:shadow-xl transition-all duration-300 no-underline text-dark"
+                    >
+                      <div className="aspect-[4/3] bg-gray-100 overflow-hidden relative">
+                        {sc.images && sc.images.length > 0 ? (
+                          <img src={sc.images[0].url} alt={sc.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-gray-400 font-bold uppercase text-xs">No Image</div>
+                        )}
+                        {sc.platformInspectedBadge && (
+                          <span className="absolute top-3 left-3 px-3 py-1 bg-dark text-white text-[10px] font-black uppercase tracking-widest">Verified</span>
+                        )}
+                        {/* Removed the % Match arbitrary bubble */}
+                      </div>
+                      <div className="p-5">
+                        <h3 className="font-bold text-dark text-sm uppercase tracking-wider mb-2 line-clamp-2 leading-tight">{sc.title}</h3>
+                        <p className="text-xl font-black text-dark mb-4">{fmt(sc.basePrice)}</p>
+                        
+                        <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-gray-500 font-medium">
+                          <span>{sc.year}</span>
+                          <span className="text-gray-300">•</span>
+                          <span>{sc.mileage ? `${(sc.mileage / 1000).toFixed(0)}k km` : 'N/A'}</span>
+                          <span className="text-gray-300">•</span>
+                          <span>{sc.fuelType}</span>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+
+              <div className="text-center mt-12">
+                <Link
+                  to={`/cars?makerId=${car.makerId}&bodyTypeId=${car.bodyTypeId}`}
+                  className="inline-block px-10 py-4 bg-dark text-white font-bold uppercase tracking-wider hover:bg-black transition-colors no-underline"
+                >
+                  Explore More {car.maker?.name}
+                </Link>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+};
+
+export default CarDetailSEO;

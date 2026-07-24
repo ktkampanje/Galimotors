@@ -1,0 +1,381 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap');
+@import "tailwindcss";
+
+/*
+ * GaliMotors brand system — Deep Navy + Gold.
+ * "coral" is the historical token name for the PRIMARY brand color (deep navy).
+ * Gold is an accent for fills and dark-surface highlights ONLY — it fails
+ * contrast as text on white; use gold-dark for text-gold on light surfaces.
+ */
+@theme {
+  --color-dark: #101418;
+  --color-dark-muted: #0A0D10;
+  --color-coral: #13293D;
+  --color-coral-light: #E8EEF4;
+  --color-coral-dark: #0E1F2F;
+  --color-gold: #D9A404;
+  --color-gold-light: #FAF1DA;
+  --color-gold-dark: #8A6A00;
+  --color-surface: #FFFFFF;
+  --color-muted: #F7F7F5;
+  --color-border: #E8E7E3;
+  --color-text-primary: #101418;
+  --color-text-secondary: #6E6D66;
+  --color-text-tertiary: #9C9A92;
+  --color-success: #1E7B4F;
+  --color-success-light: #E7F2EB;
+  --color-warning: #B45309;
+  --color-warning-light: #FBEFE0;
+  --color-danger: #B42318;
+  --color-danger-light: #FBECEA;
+  --color-info: #1C5D99;
+  --color-info-light: #E8F0F8;
+  --color-gray-50: #FAFAF8;
+  --color-gray-100: #F7F7F5;
+  --color-gray-200: #E8E7E3;
+  --color-gray-300: #D6D4CE;
+  --color-gray-400: #A8A69E;
+  --color-gray-500: #6E6D66;
+  --color-gray-600: #57564F;
+  --color-gray-700: #403F3A;
+  --color-gray-800: #262622;
+  --color-gray-900: #101418;
+  --color-gray-950: #0A0D10;
+  --font-sans: "Manrope", "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  /* Display face for headlines only — a distinct voice for h1/h2 is what
+     separates a designed identity from a single-font template. Plus Jakarta
+     Sans: contemporary and confident without quirky glyphs (Space Grotesk
+     was tried and rejected). Gold-fails-on-white still applies to headings. */
+  --font-display: "Plus Jakarta Sans", "Manrope", sans-serif;
+}
+
+@layer base {
+  html {
+    font-size: 82%;
+    scroll-behavior: smooth;
+  }
+  @media (min-width: 640px) {
+    html { font-size: 70%; }
+  }
+
+  body {
+    @apply text-text-primary bg-white font-sans antialiased;
+    font-size: 1rem;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  a { @apply no-underline; }
+
+  /* Headline voice: Space Grotesk with tightened tracking. h3 and below stay
+     in the body face so cards and labels remain quiet. */
+  h1, h2 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+
+  * {
+    @apply border-border;
+    -webkit-overflow-scrolling: touch; /* Momentum scrolling on iOS */
+  }
+  ::selection { background: color-mix(in srgb, var(--color-coral) 14%, transparent); }
+}
+
+@layer components {
+  /* ── Buttons (NO ROUNDING - Sharp Professional) ──────────── */
+  /* min-h-11 on mobile keeps tap targets at the 44px iOS minimum. */
+  /* active:scale gives every press a tactile response — one of the small
+     tells of a finished product. transition-all covers both color and the
+     scale so neither snaps. */
+  .btn-primary {
+    @apply inline-flex items-center justify-center bg-coral text-white font-semibold text-sm px-5 py-3 sm:py-2.5 min-h-11 sm:min-h-0
+           hover:bg-coral-dark active:scale-[0.98] transition-all duration-200;
+  }
+  .btn-outline {
+    @apply inline-flex items-center justify-center border border-border text-text-primary font-semibold text-sm px-5 py-3 sm:py-2.5 min-h-11 sm:min-h-0
+           hover:bg-muted hover:border-text-tertiary active:scale-[0.98] transition-all duration-200;
+  }
+  .btn-dark {
+    @apply inline-flex items-center justify-center bg-dark text-white font-semibold text-sm px-5 py-3 sm:py-2.5 min-h-11 sm:min-h-0
+           hover:bg-black active:scale-[0.98] transition-all duration-200;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center text-text-secondary font-medium text-sm px-3 py-2.5 sm:py-2 min-h-11 sm:min-h-0
+           hover:bg-muted hover:text-text-primary transition-colors duration-200;
+  }
+
+  /* ── Typography ──────────────────────────────────────────── */
+  .section-label {
+    @apply text-[10px] font-bold uppercase tracking-[0.15em] text-text-tertiary;
+  }
+
+  /* ── Car listing item (Sharp, Professional - NO ROUNDING) ─── */
+  .car-item {
+    @apply cursor-pointer transition-all duration-300;
+  }
+  .car-item:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 24px rgba(0,0,0,0.10);
+  }
+  /* Gold frame on hover — the brand accent responding to attention. */
+  .car-item:hover .car-item-image {
+    border-color: var(--color-gold);
+  }
+  .car-item-image {
+    @apply relative overflow-hidden bg-muted aspect-[4/3] mb-3;
+    border: 1px solid var(--color-border);
+    transition: border-color 0.2s ease;
+  }
+  .car-item-image img {
+    @apply w-full h-full object-cover transition-transform duration-500 ease-out;
+  }
+  .car-item:hover .car-item-image img {
+    transform: scale(1.03);
+  }
+  .car-item-make {
+    @apply text-[11px] font-semibold text-text-secondary uppercase tracking-wide;
+  }
+  .car-item-title {
+    @apply text-[13.5px] sm:text-[13px] font-bold text-dark leading-snug mt-1 truncate;
+  }
+  .car-item-specs {
+    @apply flex items-center gap-2 text-[11.5px] sm:text-[11px] text-text-secondary mt-1.5;
+  }
+  .car-item-price {
+    /* nowrap + the NBSP in the formatter guarantee "MK 28,000,000" is one
+       unbreakable token — it must never stack "MK" above the amount. */
+    @apply text-[16px] sm:text-[15px] font-bold text-dark mt-2 leading-none whitespace-nowrap tabular-nums;
+  }
+
+  /* ── Filter select (Sharp - NO ROUNDING) ─────────────────── */
+  /* min-h-11 keeps the tap target at the 44px iOS minimum on mobile. */
+  .filter-select {
+    @apply w-full border border-border px-3.5 py-3 sm:py-2.5 min-h-11 sm:min-h-0 text-base sm:text-sm outline-none bg-white
+           focus:border-coral focus:ring-1 focus:ring-coral/20 text-text-primary transition-colors duration-200;
+  }
+
+  /* ── Page container ──────────────────────────────────────── */
+  .page-container {
+    @apply max-w-[1400px] mx-auto px-5 sm:px-8 lg:px-14 xl:px-16;
+  }
+
+  /* ── Sidebar section (Sharp - NO ROUNDING) ───────────────── */
+  .sidebar-section {
+    @apply pb-6 mb-6 border-b border-border/60 last:border-b-0 last:mb-0 last:pb-0;
+  }
+  .sidebar-section-title {
+    @apply text-[11px] font-bold uppercase tracking-wide text-text-tertiary mb-3;
+  }
+  .sidebar-link {
+    @apply flex items-center justify-between w-full py-2 px-2 -mx-2 text-[13px] font-medium text-text-primary
+           hover:text-gold-dark hover:bg-gold-light/40 transition-colors duration-200 text-left;
+  }
+
+  /* ── Badge (Sharp - NO ROUNDING) ─────────────────────────── */
+  .badge {
+    @apply inline-flex items-center text-[11px] font-medium px-2.5 py-0.5 bg-muted text-text-secondary;
+  }
+  .badge-coral {
+    @apply inline-flex items-center text-[11px] font-semibold px-2.5 py-0.5 bg-coral text-white;
+  }
+  .badge-gold {
+    @apply inline-flex items-center text-[11px] font-semibold px-2.5 py-0.5 bg-gold text-dark;
+  }
+
+  /* ── Search input ────────────────────────────────────────── */
+  /* 16px on mobile for the same iOS auto-zoom reason as .field below. The
+     desktop search overrides the size explicitly and never hits this. */
+  .search-input {
+    @apply w-full outline-none bg-transparent text-[16px] sm:text-sm font-medium text-dark placeholder:text-text-tertiary;
+  }
+
+  /* ── Form field (professional, flat, editorial) ──────────── */
+  /* 16px on mobile is deliberate: iOS Safari auto-zooms the page when a
+     focused input's font-size is below 16px. Drops to 14px from sm up. */
+  .field {
+    @apply w-full bg-white border border-border px-4 py-3 min-h-11 sm:min-h-0 text-[16px] sm:text-[14px] font-medium text-dark
+           placeholder:text-text-tertiary placeholder:font-normal outline-none
+           focus:border-coral focus:ring-2 focus:ring-coral/10 transition-all duration-200;
+  }
+  .field-label {
+    @apply block text-[12px] font-bold uppercase tracking-wide text-text-secondary mb-2;
+  }
+
+  /* ── Glass card utility ──────────────────────────────────── */
+  .glass {
+    background: rgba(255,255,255,0.7);
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+  }
+}
+
+/* ── Animations ──────────────────────────────────────────────── */
+
+/* Hero backdrop — an endless slow slide of inventory photos. The strip is
+   rendered twice back-to-back, so translating by exactly -50% loops
+   seamlessly. */
+@keyframes hero-marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.animate-hero-marquee {
+  animation: hero-marquee 45s linear infinite;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes shimmer {
+  0%   { background-position: -800px 0; }
+  100% { background-position:  800px 0; }
+}
+@keyframes subtlePulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.7; }
+}
+@keyframes floatUp {
+  0%   { transform: translateY(0); }
+  50%  { transform: translateY(-4px); }
+  100% { transform: translateY(0); }
+}
+
+.animate-fade-up    { animation: fadeUp    0.5s cubic-bezier(0.22,1,0.36,1) both; }
+.animate-fade-in    { animation: fadeIn    0.35s ease-out both; }
+.animate-fade-scale { animation: fadeInScale 0.4s cubic-bezier(0.22,1,0.36,1) both; }
+.animate-slide-in-r { animation: slideInRight 0.5s cubic-bezier(0.22,1,0.36,1) both; }
+.animate-slide-in-l { animation: slideInLeft  0.5s cubic-bezier(0.22,1,0.36,1) both; }
+.animate-slide-up   { animation: slideUp 0.4s cubic-bezier(0.22,1,0.36,1) both; }
+.animate-float      { animation: floatUp 3s ease-in-out infinite; }
+
+.delay-1 { animation-delay: 50ms; }
+.delay-2 { animation-delay: 100ms; }
+.delay-3 { animation-delay: 150ms; }
+.delay-4 { animation-delay: 200ms; }
+.delay-5 { animation-delay: 250ms; }
+.delay-6 { animation-delay: 300ms; }
+
+/* ── Staggered children animation ────────────────────────────── */
+.stagger-children > * {
+  opacity: 0;
+  animation: fadeUp 0.5s cubic-bezier(0.22,1,0.36,1) both;
+}
+.stagger-children > *:nth-child(1)  { animation-delay: 0ms; }
+.stagger-children > *:nth-child(2)  { animation-delay: 50ms; }
+.stagger-children > *:nth-child(3)  { animation-delay: 100ms; }
+.stagger-children > *:nth-child(4)  { animation-delay: 150ms; }
+.stagger-children > *:nth-child(5)  { animation-delay: 200ms; }
+.stagger-children > *:nth-child(6)  { animation-delay: 250ms; }
+.stagger-children > *:nth-child(7)  { animation-delay: 300ms; }
+.stagger-children > *:nth-child(8)  { animation-delay: 350ms; }
+.stagger-children > *:nth-child(9)  { animation-delay: 400ms; }
+.stagger-children > *:nth-child(10) { animation-delay: 450ms; }
+.stagger-children > *:nth-child(11) { animation-delay: 500ms; }
+.stagger-children > *:nth-child(12) { animation-delay: 550ms; }
+
+/* ── Skeleton (Sharp - NO ROUNDING) ──────────────────────────── */
+.skeleton {
+  animation: shimmer 1.8s infinite linear;
+  background: linear-gradient(
+    100deg,
+    var(--color-muted) 30%,
+    color-mix(in srgb, var(--color-border) 45%, var(--color-muted)) 50%,
+    var(--color-muted) 70%
+  );
+  background-size: 800px 100%;
+}
+
+/* ── Scrollbar ───────────────────────────────────────────────── */
+/* Professional hidden scrollbar (appears on hover) - like Apple.com, Notion */
+
+/* WebKit browsers (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 999px;
+  transition: background 0.3s ease;
+}
+
+/* Show scrollbar only when hovering the scrollable container */
+*:hover::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color-text-tertiary) 30%, transparent);
+}
+
+*:hover::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--color-text-tertiary) 60%, transparent);
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+*:hover {
+  scrollbar-color: color-mix(in srgb, var(--color-text-tertiary) 30%, transparent) transparent;
+}
+
+/* Utility to completely hide scrollbar */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ── Images ──────────────────────────────────────────────────── */
+img { @apply transition-opacity duration-300; }
+img[loading="lazy"] { min-height: 40px; background-color: var(--color-muted); }
+
+/* ── Focus ring ──────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-coral) 55%, transparent);
+  outline-offset: 2px;
+}
+
+/* Form fields show focus through their own border + ring (see .field /
+   .search-input), never the offset outline meant for buttons and links —
+   that offset outline floats as a detached box inside search bars. */
+input:focus,
+input:focus-visible,
+select:focus,
+select:focus-visible,
+textarea:focus,
+textarea:focus-visible {
+  outline: none;
+}
+
+/* ── Smooth page transitions ─────────────────────────────────── */
+.page-enter {
+  animation: fadeUp 0.4s cubic-bezier(0.22,1,0.36,1) both;
+}

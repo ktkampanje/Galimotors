@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Seller & Attendant Selects</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 1000px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .card {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1 { color: #333; margin-top: 0; }
+        button {
+            background: #ff6b6b;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #ff5252; }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 13px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .success { background: #e8f5e9; border-left: 4px solid #4CAF50; }
+        .error { background: #ffebee; border-left: 4px solid #f44336; }
+        .info { background: #e3f2fd; border-left: 4px solid #2196F3; }
+        .warning { background: #fff3e0; border-left: 4px solid #FF9800; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>🔍 Debug: Seller & Attendant Dropdowns</h1>
+        <p>This page tests why the seller and attendant dropdowns might be empty.</p>
+        
+        <div style="background: #fff3e0; padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid #FF9800;">
+            <strong>⚠️ Important:</strong> Make sure you're logged into the admin panel first!<br>
+            <small>Open <a href="http://localhost:5173" target="_blank">http://localhost:5173</a> and log in</small>
+        </div>
+        
+        <button onclick="testAll()">🚀 Test All Endpoints</button>
+        <button onclick="testSellers()">👥 Test Sellers</button>
+        <button onclick="testAttendants()">🏪 Test Attendants</button>
+        <button onclick="testMarkets()">📍 Test Markets</button>
+        
+        <div id="result"></div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:5000/api';
+        
+        function log(message, type = 'info') {
+            const result = document.getElementById('result');
+            result.className = 'result ' + type;
+            result.innerHTML = message;
+        }
+
+        function getToken() {
+            try {
+                return localStorage.getItem('admin_token');
+            } catch (e) {
+                return null;
+            }
+        }
+
+        async function testSellers() {
+            log('Testing sellers endpoint...', 'info');
+            
+            const token = getToken();
+            if (!token) {
+                log('❌ No token found!\n\nLog in to admin panel first.', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}/sellers`, {
+                    headers: {
+                        'Authorization': 'Bearer ' + token,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    if (Array.isArray(data) && data.length > 0) {
+                        log('✅ Sellers endpoint works!\n\n' +
+                            'Found ' + data.length + ' seller(s):\n\n' +
+                            data.map((s, i) => `${i + 1}. ${s.name} (${s.phone}) - ${s.sellerType}`).join('\n') +
+                            '\n\nFull response:\n' +
+                            JSON.stringify(data, null, 2), 'success');
+                    } else {
+                        log('⚠️  Sellers endpoint works but returned empty array!\n\n' +
+                            'Response: ' + JSON.stringify(data, null, 2) + '\n\n' +
+                            'You need to create sellers first:\n' +
+                            '1. Go to admin panel\n' +
+                            '2. Navigate to User Management or Sellers\n' +
+                            '3. Add new sellers', 'warning');
+                    }
+                } else {
+                    log('❌ Request failed!\n\n' +
+                        'Status: ' + response.status + '\n' +
+                        'Response: ' + JSON.stringify(data, null, 2), 'error');
+                }
+            } catch (error) {
+                log('❌ Network error!\n\n' +
+                    'Error: ' + error.message + '\n\n' +
+                    'Make sure backend is running.', 'error');
+            }
+        }
+
+        async function testAttendants() {
+            log('Testing attendants endpoint...', 'info');
+            
+            const token = getToken();
+            if (!token) {
+                log('❌ No token found!\n\nLog in to admin panel first.', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}/attendants`, {
+                    headers: {
+                        'Authorization': 'Bearer ' + token,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    if (Array.isArray(data) && data.length > 0) {
+                        log('✅ Attendants endpoint works!\n\n' +
+                            'Found ' + data.length + ' attendant(s):\n\n' +
+                            data.map((a, i) => `${i + 1}. ${a.name} (${a.phone || 'N/A'})`).join('\n') +
+                            '\n\nFull response:\n' +
+                            JSON.stringify(data, null, 2), 'success');
+                    } else {
+                        log('⚠️  Attendants endpoint works but returned empty array!\n\n' +
+                            'Response: ' + JSON.stringify(data, null, 2) + '\n\n' +
+                            'You need to create attendants first:\n' +
+                            '1. Go to admin panel\n' +
+                            '2. Navigate to Market Management\n' +
+                            '3. Add attendants to markets', 'warning');
+                    }
+                } else {
+                    log('❌ Request failed!\n\n' +
+                        'Status: ' + response.status + '\n' +
+                        'Response: ' + JSON.stringify(data, null, 2), 'error');
+                }
+            } catch (error) {
+                log('❌ Network error!\n\n' +
+                    'Error: ' + error.message + '\n\n' +
+                    'Make sure backend is running.', 'error');
+            }
+        }
+
+        async function testMarkets() {
+            log('Testing markets endpoint...', 'info');
+            
+            try {
+                const response = await fetch(`${API_URL}/markets`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    if (Array.isArray(data) && data.length > 0) {
+                        log('✅ Markets endpoint works!\n\n' +
+                            'Found ' + data.length + ' market(s):\n\n' +
+                            data.map((m, i) => `${i + 1}. ${m.name} (${m.district})`).join('\n') +
+                            '\n\nFull response:\n' +
+                            JSON.stringify(data, null, 2), 'success');
+                    } else {
+                        log('⚠️  Markets endpoint works but returned empty array!', 'warning');
+                    }
+                } else {
+                    log('❌ Request failed!\n\n' +
+                        'Status: ' + response.status + '\n' +
+                        'Response: ' + JSON.stringify(data, null, 2), 'error');
+                }
+            } catch (error) {
+                log('❌ Network error!\n\n' +
+                    'Error: ' + error.message, 'error');
+            }
+        }
+
+        async function testAll() {
+            log('Running all tests...\n\n', 'info');
+            
+            const token = getToken();
+            if (!token) {
+                log('❌ No token found!\n\n' +
+                    'Please log in to admin panel first:\n' +
+                    '1. Open http://localhost:5173\n' +
+                    '2. Log in with admin credentials\n' +
+                    '3. Come back to this page\n' +
+                    '4. Run tests again', 'error');
+                return;
+            }
+            
+            let results = '🧪 TEST RESULTS\n' +
+                         '═══════════════════════════════════\n\n';
+            
+            // Test Sellers
+            try {
+                const sellersRes = await fetch(`${API_URL}/sellers`, {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                const sellers = await sellersRes.json();
+                results += '1️⃣ Sellers: ';
+                if (sellersRes.ok && Array.isArray(sellers)) {
+                    results += `✅ ${sellers.length} found\n`;
+                    if (sellers.length > 0) {
+                        results += `   Sample: ${sellers[0].name}\n`;
+                    }
+                } else {
+                    results += `❌ Failed (${sellersRes.status})\n`;
+                }
+            } catch (e) {
+                results += '1️⃣ Sellers: ❌ Error: ' + e.message + '\n';
+            }
+            
+            // Test Attendants
+            try {
+                const attendantsRes = await fetch(`${API_URL}/attendants`, {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                const attendants = await attendantsRes.json();
+                results += '2️⃣ Attendants: ';
+                if (attendantsRes.ok && Array.isArray(attendants)) {
+                    results += `✅ ${attendants.length} found\n`;
+                    if (attendants.length > 0) {
+                        results += `   Sample: ${attendants[0].name}\n`;
+                    }
+                } else {
+                    results += `❌ Failed (${attendantsRes.status})\n`;
+                }
+            } catch (e) {
+                results += '2️⃣ Attendants: ❌ Error: ' + e.message + '\n';
+            }
+            
+            // Test Markets
+            try {
+                const marketsRes = await fetch(`${API_URL}/markets`);
+                const markets = await marketsRes.json();
+                results += '3️⃣ Markets: ';
+                if (marketsRes.ok && Array.isArray(markets)) {
+                    results += `✅ ${markets.length} found\n`;
+                    if (markets.length > 0) {
+                        results += `   Sample: ${markets[0].name}\n`;
+                    }
+                } else {
+                    results += `❌ Failed (${marketsRes.status})\n`;
+                }
+            } catch (e) {
+                results += '3️⃣ Markets: ❌ Error: ' + e.message + '\n';
+            }
+            
+            results += '\n═══════════════════════════════════\n\n';
+            results += '💡 If all tests pass but dropdowns are still empty:\n';
+            results += '   1. Check browser console (F12) for errors\n';
+            results += '   2. Make sure admin panel dev server was restarted\n';
+            results += '   3. Hard refresh the page (Ctrl+Shift+R)\n';
+            results += '   4. Check if CustomSelect component is working';
+            
+            log(results, 'info');
+        }
+
+        // Auto-run on load
+        window.onload = () => {
+            setTimeout(() => {
+                log('Ready to test!\n\nClick "Test All Endpoints" to start.', 'info');
+            }, 500);
+        };
+    </script>
+</body>
+</html>
