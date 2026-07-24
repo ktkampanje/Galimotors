@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { ciContains } from "../lib/searchFilters";
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
@@ -17,11 +18,11 @@ export const globalSearch = async (req: Request, res: Response) => {
     const cars = await prisma.car.findMany({
       where: {
         OR: [
-          { title: { contains: q } },
-          { registrationNumber: { contains: q } },
-          { chassisNumber: { contains: q } },
-          { maker: { name: { contains: q } } },
-          { model: { name: { contains: q } } },
+          { title: ciContains(q) },
+          { registrationNumber: ciContains(q) },
+          { chassisNumber: ciContains(q) },
+          { maker: { name: ciContains(q) } },
+          { model: { name: ciContains(q) } },
           { id: { startsWith: q } }
         ]
       },
@@ -39,10 +40,10 @@ export const globalSearch = async (req: Request, res: Response) => {
     const leads = await prisma.lead.findMany({
       where: {
         OR: [
-          { buyerName: { contains: q } },
-          { buyerPhone: { contains: q } },
-          { referenceNumber: { contains: q } },
-          { car: { title: { contains: q } } },
+          { buyerName: ciContains(q) },
+          { buyerPhone: ciContains(q) },
+          { referenceNumber: ciContains(q) },
+          { car: { title: ciContains(q) } },
           { id: { startsWith: q } }
         ]
       },
@@ -61,9 +62,9 @@ export const globalSearch = async (req: Request, res: Response) => {
     const sellRequests = await prisma.sellRequest.findMany({
       where: {
         OR: [
-          { name: { contains: q } },
-          { phone: { contains: q } },
-          { carDetails: { contains: q } },
+          { name: ciContains(q) },
+          { phone: ciContains(q) },
+          { carDetails: ciContains(q) },
           { id: { startsWith: q } }
         ]
       },

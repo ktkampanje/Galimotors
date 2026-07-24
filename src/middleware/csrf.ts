@@ -4,7 +4,14 @@ import crypto from 'crypto';
 // Simple CSRF token generation and validation
 // In production, consider using 'csurf' package for more robust protection
 
-const CSRF_SECRET = process.env.CSRF_SECRET || 'galimotors-csrf-secret-change-in-production';
+// Falls back to a key derived from JWT_SECRET rather than a literal — the old
+// hardcoded default is in this file, which is public, so anyone could have
+// minted valid CSRF tokens on a deployment that didn't set CSRF_SECRET.
+const CSRF_SECRET =
+  process.env.CSRF_SECRET ||
+  (process.env.JWT_SECRET
+    ? crypto.createHmac('sha256', process.env.JWT_SECRET).update('galimotors:csrf').digest('hex')
+    : 'dev-only-insecure-csrf-secret');
 
 // Generate CSRF token
 export const generateCsrfToken = (): string => {

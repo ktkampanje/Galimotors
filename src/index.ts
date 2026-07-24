@@ -37,6 +37,7 @@ import searchRoutes from "./routes/searchRoutes";
 import { initCronJobs } from "./jobs/cronJobs";
 import { getFilterStatsFromCache } from "./services/filterStatsCacheService";
 import { applySqlitePragmas } from "./services/backupService";
+import { bootstrapSuperAdmin } from "./services/adminBootstrap";
 import prisma from "./lib/prisma";
 
 // Security middleware
@@ -223,6 +224,12 @@ app.get("*", (req, res) => {
 // Tune SQLite for live traffic (WAL mode etc.) before requests arrive
 applySqlitePragmas().catch((error) => {
   console.error("⚠️  Failed to apply SQLite pragmas:", error);
+});
+
+// Create the first admin from SUPER_ADMIN_* env vars when none exists yet —
+// a fresh production database otherwise has no way in.
+bootstrapSuperAdmin().catch((error) => {
+  console.error("⚠️  Admin bootstrap failed:", error);
 });
 
 // Initialize filter stats cache on startup

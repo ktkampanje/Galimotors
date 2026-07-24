@@ -1,5 +1,6 @@
 // Smart Search Ranking Algorithm Service
 import prisma from '../lib/prisma';
+import { ciContains } from '../lib/searchFilters';
 
 interface SearchCriteria {
   makerId?: string;
@@ -203,9 +204,9 @@ export class SearchRankingService {
 
       if (searchCriteria.search) {
         where.OR = [
-          { title: { contains: searchCriteria.search } },
-          { maker: { name: { contains: searchCriteria.search } } },
-          { model: { name: { contains: searchCriteria.search } } }
+          { title: ciContains(searchCriteria.search) },
+          { maker: { name: ciContains(searchCriteria.search) } },
+          { model: { name: ciContains(searchCriteria.search) } }
         ];
       }
 

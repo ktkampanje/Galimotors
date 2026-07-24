@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { ciContains } from "../lib/searchFilters";
 import prisma from "../lib/prisma";
 import { Prisma } from "@prisma/client";
 import { invalidateFilterStatsCache } from "../services/filterStatsCacheService";
@@ -314,8 +315,8 @@ export const getCars = async (req: Request, res: Response) => {
     } else if (search) {
       const searchTerm = search as string;
       where.OR = [
-        { title: { contains: searchTerm } },
-        { inspectionNotes: { contains: searchTerm } },
+        { title: ciContains(searchTerm) },
+        { inspectionNotes: ciContains(searchTerm) },
         { id: { startsWith: searchTerm } },
       ];
     }

@@ -2,26 +2,45 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 
-// Separate secrets for admin and customer authentication
-const JWT_SECRET_ADMIN = process.env.JWT_SECRET_ADMIN || process.env.JWT_SECRET || "fallback_admin_secret_change_me";
-const JWT_REFRESH_SECRET_ADMIN = process.env.JWT_REFRESH_SECRET_ADMIN || process.env.JWT_REFRESH_SECRET || "fallback_admin_refresh_secret_change_me";
+/**
+ * Token signing keys.
+ *
+ * Admin and customer tokens MUST be signed with different keys, so a customer
+ * token can never be replayed as an admin one. You can supply all four
+ * explicitly, but a single `JWT_SECRET` is enough: the four keys are then
+ * derived from it with HMAC-SHA256 under distinct labels. Derivation keeps the
+ * keys cryptographically independent — knowing one does not reveal the master
+ * or any sibling — while keeping deployment to one environment variable.
+ */
+const deriveKey = (master: string, purpose: string) =>
+  crypto.createHmac("sha256", master).update(`galimotors:${purpose}`).digest("hex");
 
-const JWT_SECRET_CUSTOMER = process.env.JWT_SECRET_CUSTOMER || "fallback_customer_secret_change_me";
-const JWT_REFRESH_SECRET_CUSTOMER = process.env.JWT_REFRESH_SECRET_CUSTOMER || "fallback_customer_refresh_secret_change_me";
+// A master is required in production (guard below). The dev-only fallback is
+// deliberately obvious; it never applies once NODE_ENV=production.
+const JWT_MASTER = process.env.JWT_SECRET || process.env.JWT_REFRESH_SECRET || "dev-only-insecure-master-secret";
 
-// Security: refuse to boot in production with fallback secrets — anyone who
-// reads this source could otherwise forge valid tokens.
+const JWT_SECRET_ADMIN = process.env.JWT_SECRET_ADMIN || deriveKey(JWT_MASTER, "admin-access");
+const JWT_REFRESH_SECRET_ADMIN = process.env.JWT_REFRESH_SECRET_ADMIN || deriveKey(JWT_MASTER, "admin-refresh");
+const JWT_SECRET_CUSTOMER = process.env.JWT_SECRET_CUSTOMER || deriveKey(JWT_MASTER, "customer-access");
+const JWT_REFRESH_SECRET_CUSTOMER = process.env.JWT_REFRESH_SECRET_CUSTOMER || deriveKey(JWT_MASTER, "customer-refresh");
+
+// Security: refuse to boot in production without a real secret — this file is
+// public, so anyone could otherwise forge valid tokens. Either set JWT_SECRET
+// (recommended: everything is derived from it) or all four explicit keys.
 if (process.env.NODE_ENV === "production") {
-  const required = [
+  const hasMaster = !!(process.env.JWT_SECRET || process.env.JWT_REFRESH_SECRET);
+  const hasAllExplicit = [
     "JWT_SECRET_ADMIN",
     "JWT_REFRESH_SECRET_ADMIN",
     "JWT_SECRET_CUSTOMER",
     "JWT_REFRESH_SECRET_CUSTOMER",
-  ];
-  const missing = required.filter((key) => !process.env[key]);
-  if (missing.length > 0) {
+  ].every((key) => !!process.env[key]);
+
+  if (!hasMaster && !hasAllExplicit) {
     throw new Error(
-      `FATAL: JWT secrets must be set in production. Missing: ${missing.join(", ")}`,
+      "FATAL: set JWT_SECRET (all token keys are derived from it), or supply " +
+        "JWT_SECRET_ADMIN, JWT_REFRESH_SECRET_ADMIN, JWT_SECRET_CUSTOMER and " +
+        "JWT_REFRESH_SECRET_CUSTOMER explicitly.",
     );
   }
 }

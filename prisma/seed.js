@@ -27,8 +27,11 @@ async function main() {
   // This used to hardcode admin@galimotors.com / admin123, which shipped a
   // publicly-known SUPER_ADMIN login into every database the seed touched.
   const bcrypt = require('bcryptjs');
-  const seedEmail = process.env.SEED_ADMIN_EMAIL;
-  const seedPassword = process.env.SEED_ADMIN_PASSWORD;
+  // SUPER_ADMIN_* matches the production (Vercel) env naming; SEED_ADMIN_*
+  // kept as an alias. The server also self-bootstraps from SUPER_ADMIN_* on
+  // boot when no super admin exists (src/services/adminBootstrap.ts).
+  const seedEmail = process.env.SUPER_ADMIN_EMAIL || process.env.SEED_ADMIN_EMAIL;
+  const seedPassword = process.env.SUPER_ADMIN_PASSWORD || process.env.SEED_ADMIN_PASSWORD;
 
   if (seedEmail && seedPassword) {
     console.log('👤 Creating admin user from SEED_ADMIN_* env vars...');

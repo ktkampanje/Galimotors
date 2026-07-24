@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import prisma from "../lib/prisma";
+import { getSiteUrl } from "../lib/siteUrl";
 import { validateMalawianPhone, sanitizePhone } from "../middleware/sanitize";
 import notificationService from "../services/notificationService";
 import { buildWhatsAppUrl } from "../lib/whatsapp";
@@ -857,7 +858,7 @@ export const sendQuote = async (req: Request, res: Response) => {
     });
 
     // Generate WhatsApp message for admin to send
-    const whatsappMessage = `Hi ${lead.buyerName}! 👋\n\nYour quote for ${lead.car.maker?.name} ${lead.car.model?.name} (${lead.car.title}) is ready!\n\n💰 Price: MK ${parsedPrice.toLocaleString()}\n${paymentTerms ? `💳 Payment: ${paymentTerms}\n` : ""}${adminResponse ? `\n📝 ${adminResponse}\n` : ""}\n🔗 View & respond: ${process.env.FRONTEND_URL || "http://localhost:5173"}/quote/${lead.referenceNumber}\n\nReply to this message to proceed!\n\n- GaliMotors Team`;
+    const whatsappMessage = `Hi ${lead.buyerName}! 👋\n\nYour quote for ${lead.car.maker?.name} ${lead.car.model?.name} (${lead.car.title}) is ready!\n\n💰 Price: MK ${parsedPrice.toLocaleString()}\n${paymentTerms ? `💳 Payment: ${paymentTerms}\n` : ""}${adminResponse ? `\n📝 ${adminResponse}\n` : ""}\n🔗 View & respond: ${getSiteUrl()}/quote/${lead.referenceNumber}\n\nReply to this message to proceed!\n\n- GaliMotors Team`;
 
     res.json({
       message: "Quote prepared successfully",
@@ -1277,7 +1278,7 @@ export const respondToCounterOffer = async (req: Request, res: Response) => {
     });
 
     // Generate WhatsApp message for admin to send to customer
-    const whatsappMessage = `Hi ${lead.buyerName}! 👋\n\nWe've responded to your offer on ${lead.car.title}.\n\n${responsePrice ? `💰 Our Price: MK ${parseFloat(responsePrice).toLocaleString()}\n` : ""}${responseTerms ? `💳 Terms: ${responseTerms}\n` : ""}${responseMessage ? `\n📝 ${responseMessage}\n` : ""}\n🔗 View & respond: ${process.env.FRONTEND_URL || "http://localhost:5173"}/quote/${lead.referenceNumber}\n\n- GaliMotors Team`;
+    const whatsappMessage = `Hi ${lead.buyerName}! 👋\n\nWe've responded to your offer on ${lead.car.title}.\n\n${responsePrice ? `💰 Our Price: MK ${parseFloat(responsePrice).toLocaleString()}\n` : ""}${responseTerms ? `💳 Terms: ${responseTerms}\n` : ""}${responseMessage ? `\n📝 ${responseMessage}\n` : ""}\n🔗 View & respond: ${getSiteUrl()}/quote/${lead.referenceNumber}\n\n- GaliMotors Team`;
 
     res.json({
       message: "Response sent successfully",
@@ -1551,7 +1552,7 @@ export const adminRespondViewing = async (req: Request, res: Response) => {
     }
 
     // Send WhatsApp to customer with link to view
-    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    const frontendUrl = getSiteUrl();
     const viewingUrl = `${frontendUrl}/viewing/${lead.referenceNumber}`;
     
     await notificationService.sendNotification({
@@ -1598,7 +1599,7 @@ export const adminSendViewingCostQuote = async (req: Request, res: Response) => 
     }
 
     // Send WhatsApp to customer with link to view
-    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    const frontendUrl = getSiteUrl();
     const viewingUrl = `${frontendUrl}/viewing/${lead.referenceNumber}`;
     
     await notificationService.sendNotification({

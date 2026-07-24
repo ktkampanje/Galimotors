@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import prisma from "../lib/prisma";
+import { getSiteUrl } from "../lib/siteUrl";
 
 /**
  * Meta (Facebook) catalog feed — the URL pasted into Commerce Manager as a
@@ -25,11 +26,7 @@ const csvCell = (v: unknown): string => {
 
 router.get("/meta-catalog.csv", async (_req: Request, res: Response) => {
   try {
-    const siteUrl = (
-      process.env.PUBLIC_SITE_URL ||
-      process.env.FRONTEND_URL ||
-      "http://localhost:5174"
-    ).replace(/\/$/, "");
+    const siteUrl = getSiteUrl();
 
     const cars = await prisma.car.findMany({
       where: { status: "AVAILABLE", deletedAt: null },
