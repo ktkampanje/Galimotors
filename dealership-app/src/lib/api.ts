@@ -10,7 +10,14 @@
  */
 import axios from 'axios';
 
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+// Production default is SAME-ORIGIN /api — the Vercel project serves the SPA
+// and the API from one domain. Without this, a build made without
+// VITE_API_URL shipped pointing at the developer's localhost, so the live
+// site asked each visitor's own machine for data and every list came back
+// empty.
+export const API_BASE_URL =
+  import.meta.env.VITE_API_URL ||
+  (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
