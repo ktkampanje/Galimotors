@@ -88,8 +88,10 @@ const COMPRESS_OPTIONS = { maxSizeMB: 0.8, maxWidthOrHeight: 1600, useWebWorker:
 
 // Photos are uploaded in small batches so slow connections get steady
 // progress instead of one huge request that gives no feedback until it
-// finishes (or dies).
-const UPLOAD_CHUNK = 4;
+// finishes (or dies). Three per request, not four: Vercel rejects bodies
+// over ~4.5MB, and 4 × 0.8MB compressed × 1.37 base64 overhead ≈ 4.4MB —
+// close enough to fail intermittently. 3 keeps the worst case ~3.3MB.
+const UPLOAD_CHUNK = 3;
 
 // Content hash of the ORIGINAL file — duplicate photos are caught even if
 // renamed, and regardless of what compression later does to the bytes.
