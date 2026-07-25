@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth';
+import { inquiryRateLimit } from '../middleware/security';
 
 const router = Router();
 
@@ -73,6 +74,49 @@ router.post('/images', authenticate, async (req, res) => {
   } catch (error) {
     console.error('Upload error:', error);
     res.status(500).json({ error: 'Failed to upload images' });
+  }
+});
+
+// Proof-of-payment receipt upload — the ONE public upload in the system.
+// Guests book viewings by design, so this cannot require a login; instead it
+// is boxed in tightly: a single data-URI image per request, ~3MB decoded cap,
+// the same per-IP rate limit as inquiries, and a fixed receipts folder with
+// a smaller stored size. The general /images endpoint stays admin-only.
+router.post('/receipt', inquiryRateLimit, async (req, res) => {
+  try {
+    const { image } = req.body;
+
+    if (typeof image !== 'string' || !image.startsWith('data:image/')) {
+      return res.status(400).json({ error: 'A single base64 image (data:image/...) is required' });
+    }
+    // base64 inflates ~4/3: 4.2M chars ≈ 3.1MB decoded.
+    if (image.length > 4_200_000) {
+      return res.status(413).json({ error: 'Receipt image is too large. Please use a photo under 3MB.' });
+    }
+
+    if (!isCloudinaryConfigured()) {
+      console.error('❌ Receipt upload rejected: CLOUDINARY_* env vars are not set.');
+      return res.status(503).json({ error: 'Image storage is not configured on the server. Add the Cloudinary environment variables.' });
+    }
+
+    const cloudinary = require('cloudinary').v2;
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET,
+    });
+
+    const result = await cloudinary.uploader.upload(image, {
+      folder: 'galimotors/receipts',
+      // Receipts are read by a human once — 1200px q_auto keeps them legible
+      // and small on the free tier.
+      transformation: [{ width: 1200, crop: 'limit' }, { quality: 'auto:good' }, { fetch_format: 'auto' }],
+    });
+
+    return res.json({ url: result.secure_url });
+  } catch (error) {
+    console.error('Receipt upload error:', error);
+    res.status(500).json({ error: 'Failed to upload receipt' });
   }
 });
 

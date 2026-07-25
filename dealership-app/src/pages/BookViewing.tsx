@@ -288,11 +288,13 @@ const BookViewing: React.FC = () => {
       let proofUrl = uploadedProofUrl;
       if (!proofUrl) {
         try {
-          const uploadResponse = await api.post('/upload/images', {
-            images: [popImagePreview],
-            folderPath: 'galimotors/proof-of-payment'
+          // The dedicated public receipt endpoint — /upload/images is
+          // admin-only, and calling it as a customer both failed the upload
+          // AND tripped the 401 interceptor into wiping the login session.
+          const uploadResponse = await api.post('/upload/receipt', {
+            image: popImagePreview,
           });
-          proofUrl = uploadResponse.data.images[0].url;
+          proofUrl = uploadResponse.data.url;
           setUploadedProofUrl(proofUrl);
         } catch (uploadError) {
           console.error('Failed to upload proof of payment:', uploadError);

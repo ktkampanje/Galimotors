@@ -76,6 +76,15 @@ api.interceptors.response.use(
     const url = String(original.url || '');
     const isAuthCall = url.includes('/customer/auth/');
 
+    // A 401 only says something about the CUSTOMER session when the endpoint
+    // actually authenticates customers. Admin-only endpoints 401 customers by
+    // design — treating that as "session expired" logged people out of the
+    // site because an unrelated upload was rejected.
+    const isCustomerScoped = url.includes('/customer/') || url.includes('/my-inquiries');
+    if (status === 401 && !isCustomerScoped) {
+      return Promise.reject(error);
+    }
+
     if (status === 401 && !original._retried && !isAuthCall) {
       original._retried = true;
       const newToken = await refreshCustomerToken();
