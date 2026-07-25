@@ -289,6 +289,19 @@ export const getCars = async (req: Request, res: Response) => {
       where.status = "AVAILABLE";
     }
 
+    // Exact-id set filter (?ids=a,b,c) — used by guest favorites, which store
+    // car ids in localStorage and need exactly those cars back. Before this
+    // existed the client sent id params the API ignored, so a guest's
+    // favorites page showed the ENTIRE inventory as "liked".
+    if (req.query.ids) {
+      const ids = String(req.query.ids)
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .slice(0, 50);
+      if (ids.length > 0) where.id = { in: ids };
+    }
+
     if (makerId) where.makerId = makerId as string;
     if (modelId) where.modelId = modelId as string;
     if (bodyTypeId) where.bodyTypeId = bodyTypeId as string;

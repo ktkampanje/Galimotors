@@ -63,17 +63,22 @@ class FavoritesService {
     } else {
       const localIds = this.getLocalFavorites();
       if (localIds.length === 0) return [];
-      // Fetch full car details for local IDs using public endpoint
+      // Fetch exactly the locally-favorited cars. The old code sent repeated
+      // `id=` params the API ignored, so this returned EVERY available car
+      // and the guest favorites page showed the whole inventory as liked.
       try {
-        // Build query string like ?id=1&id=2
-        const query = localIds.map(id => `id=${id}`).join('&');
-        const response = await api.get(`/cars?${query}&limit=50`);
-        // Format to match API structure
-        return response.data.cars.map((car: any) => ({
-          favoriteId: car.id, // using carId as favoriteId for local
-          addedAt: new Date().toISOString(),
-          car
-        }));
+        const response = await api.get('/cars', {
+          params: { ids: localIds.join(','), limit: 50 },
+        });
+        return (response.data.cars || [])
+          // Belt and braces: even if a stale/cached API ignores `ids`, never
+          // present a car the guest did not actually favorite.
+          .filter((car: any) => localIds.includes(car.id))
+          .map((car: any) => ({
+            favoriteId: car.id, // using carId as favoriteId for local
+            addedAt: new Date().toISOString(),
+            car
+          }));
       } catch (error) {
         console.error('Failed to fetch local favorites', error);
         return [];
