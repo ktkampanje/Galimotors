@@ -387,10 +387,10 @@ const LeadManagement: React.FC = () => {
     <>
     <ResizableSplit
       storageKey="leads"
-      className="h-[calc(100vh-140px)] -m-8 overflow-hidden bg-gray-50 text-gray-900 animate-in fade-in duration-500 rounded-tl-3xl"
+      className="lg:h-[calc(100vh-140px)] -mx-4 -my-6 lg:-mx-8 lg:overflow-hidden bg-gray-50 text-gray-900 animate-in fade-in duration-500 lg:rounded-tl-3xl"
       defaultRightWidth={520}
       left={
-      <div className="flex-1 flex flex-col bg-white shadow-sm z-10 min-h-0">
+      <div className={`flex-1 ${selectedLead ? "hidden lg:flex" : "flex"} flex-col bg-white shadow-sm z-10 min-h-0`}>
         <div className="p-8 border-b border-gray-100 bg-white">
           <div className="flex justify-between items-end mb-6">
             <div className="flex flex-col gap-1">
@@ -510,7 +510,7 @@ const LeadManagement: React.FC = () => {
       </div>
       }
       right={
-      <div className="flex-1 flex flex-col bg-gray-50 relative z-0 min-h-0">
+      <div className={`flex-1 ${selectedLead ? "flex" : "hidden lg:flex"} flex-col bg-gray-50 relative z-0 min-h-0`}>
       {selectedLead ? (
         <div className="flex flex-col h-full animate-in slide-in-from-right duration-500">
            <div className="p-6 border-b border-gray-200 flex justify-between items-center bg-white shadow-sm z-10">

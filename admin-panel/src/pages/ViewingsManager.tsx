@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Eye, Search, CheckCircle, XCircle, MapPin, Calendar, CheckSquare, X, MessageCircle } from 'lucide-react';
+import { Eye, Search, CheckCircle, XCircle, MapPin, Calendar, CheckSquare, X, MessageCircle, ArrowLeft } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useModal } from '../components/ui/ModalContext';
@@ -231,7 +231,7 @@ const ViewingsManager: React.FC = () => {
   });
 
   return (
-    <div className="flex flex-col gap-6 animate-in fade-in duration-500 pb-12 w-full max-w-7xl mx-auto h-[calc(100vh-80px)]">
+    <div className="flex flex-col gap-6 animate-in fade-in duration-500 pb-12 w-full max-w-7xl mx-auto lg:h-[calc(100vh-80px)]">
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
         <div className="flex flex-col gap-1">
@@ -250,7 +250,7 @@ const ViewingsManager: React.FC = () => {
         maxRightWidth={700}
         className="flex-1 min-h-0 gap-0"
         left={
-        <div className="w-full flex flex-col gap-4 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden h-full">
+        <div className={`w-full ${selectedViewing ? "hidden lg:flex" : "flex"} flex-col gap-4 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden h-full`}>
           <div className="p-4 border-b border-gray-100 space-y-4 shrink-0 bg-gray-50/50">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
@@ -334,11 +334,17 @@ const ViewingsManager: React.FC = () => {
 
         }
         right={
-        <div className="hidden lg:flex flex-1 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden h-full flex-col ml-6">
+        <div className={`${selectedViewing ? "flex" : "hidden"} lg:flex flex-1 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden h-full flex-col ml-0 lg:ml-6`}>
           {selectedViewing ? (
             <div className="flex-1 overflow-y-auto">
               {/* Header */}
               <div className="p-6 md:p-8 border-b border-gray-100 bg-gray-50/30">
+                <button
+                  onClick={() => setSelectedViewing(null)}
+                  className="lg:hidden flex items-center gap-1.5 text-[13px] font-semibold text-gray-500 hover:text-gray-900 mb-3"
+                >
+                  <ArrowLeft size={15} /> Back to list
+                </button>
                 <div className="flex justify-between items-start mb-4">
                   <div>
                     <h2 className="text-xl font-bold text-gray-900">{selectedViewing.buyerName}</h2>
