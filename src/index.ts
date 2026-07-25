@@ -106,6 +106,25 @@ app.use("/api/", generalRateLimit);
 // API ROUTES
 // ==========================================
 
+// Super-admin enforcement runs INSIDE the request path (memoized), not as
+// module-load fire-and-forget: a serverless instance freezes the moment a
+// response is sent, so a promise started at load time can be suspended
+// mid-write and never complete — observed on Vercel, where the env password
+// was never synced. Awaiting it here means the first request of every cold
+// start cannot finish before enforcement has. Adds one bcrypt compare to
+// that first request only; later requests reuse the settled promise.
+let adminEnforcement: Promise<void> | null = null;
+app.use((_req, _res, next) => {
+  if (!adminEnforcement) {
+    adminEnforcement = bootstrapSuperAdmin().catch((error) => {
+      console.error("⚠️  Admin bootstrap failed:", error);
+      // Allow a later request to retry rather than caching the failure.
+      adminEnforcement = null;
+    }) as Promise<void>;
+  }
+  adminEnforcement.then(() => next(), () => next());
+});
+
 // CSRF token endpoint (public)
 app.get("/api/csrf-token", getCsrfToken);
 
@@ -226,11 +245,8 @@ applySqlitePragmas().catch((error) => {
   console.error("⚠️  Failed to apply SQLite pragmas:", error);
 });
 
-// Create the first admin from SUPER_ADMIN_* env vars when none exists yet —
-// a fresh production database otherwise has no way in.
-bootstrapSuperAdmin().catch((error) => {
-  console.error("⚠️  Admin bootstrap failed:", error);
-});
+// (Super-admin enforcement middleware is registered before the API routes —
+// see the top of the API ROUTES section.)
 
 // Initialize filter stats cache on startup
 getFilterStatsFromCache()
