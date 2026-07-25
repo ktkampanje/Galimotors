@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import {
@@ -74,6 +74,10 @@ const CarDetailSEO: React.FC = () => {
   const [error, setError]       = useState<string | null>(null);
   const [imgIndex, setImgIndex] = useState(0);
   const [lightbox, setLightbox] = useState(false);
+  // Swipe tracking for the mobile gallery — most customers are on phones and
+  // swiping the photo is the gesture they will try first.
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
+  const activeThumbRef = useRef<HTMLButtonElement | null>(null);
   const [form, setForm] = useState({ name: '', phone: '', message: '', negotiationPrice: '' });
   const [wantsToNegotiate, setWantsToNegotiate] = useState(false);
   const [formStatus, setFormStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
@@ -149,6 +153,28 @@ const CarDetailSEO: React.FC = () => {
 
   const next = useCallback(() => { if (car) setImgIndex(i => (i + 1) % car.images.length); }, [car]);
   const prev = useCallback(() => { if (car) setImgIndex(i => (i - 1 + car.images.length) % car.images.length); }, [car]);
+
+  // Swipe left/right on the main photo to change image. Horizontal intent
+  // only — vertical drags stay as page scrolls.
+  const onTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  }, []);
+  const onTouchEnd = useCallback((e: React.TouchEvent) => {
+    const start = touchStart.current;
+    touchStart.current = null;
+    if (!start) return;
+    const dx = e.changedTouches[0].clientX - start.x;
+    const dy = e.changedTouches[0].clientY - start.y;
+    if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      if (dx < 0) next(); else prev();
+    }
+  }, [next, prev]);
+
+  // Keep the active thumbnail in view as the customer swipes, so the strip
+  // visibly scrolls along — that motion is itself the "there are more" cue.
+  useEffect(() => {
+    activeThumbRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+  }, [imgIndex]);
 
   useEffect(() => {
     if (!lightbox) return;
@@ -228,7 +254,12 @@ const CarDetailSEO: React.FC = () => {
 
       {/* ── Lightbox ──────────────────────────────────── */}
       {lightbox && imgs.length > 0 && (
-        <div className="fixed inset-0 z-[9999] bg-dark/95 flex items-center justify-center" onClick={() => setLightbox(false)}>
+        <div
+          className="fixed inset-0 z-[9999] bg-dark/95 flex items-center justify-center"
+          onClick={() => setLightbox(false)}
+          onTouchStart={onTouchStart}
+          onTouchEnd={onTouchEnd}
+        >
           <button onClick={e => { e.stopPropagation(); setLightbox(false); }} className="absolute top-5 right-5 w-10 h-10  bg-white/10 hover:bg-white/20 text-white flex items-center justify-center">
             <X size={20} />
           </button>
@@ -289,6 +320,8 @@ const CarDetailSEO: React.FC = () => {
               <div
                 className="relative aspect-[4/3] lg:aspect-[16/10] overflow-hidden  bg-muted cursor-pointer group"
                 onClick={() => imgs.length > 0 && setLightbox(true)}
+                onTouchStart={onTouchStart}
+                onTouchEnd={onTouchEnd}
               >
                 {imgs.length > 0 ? (
                   <img
@@ -302,18 +335,23 @@ const CarDetailSEO: React.FC = () => {
                 )}
                 {imgs.length > 1 && (
                   <>
-                    <button onClick={e => { e.stopPropagation(); prev(); }}
-                      className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10  bg-white/80 hover:bg-white backdrop-blur-sm text-dark flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                    {/* Arrows are always visible on touch screens — hover
+                        doesn't exist there, and invisible arrows meant
+                        nothing said "there are 19 more photos". Desktop
+                        keeps the reveal-on-hover behavior. */}
+                    <button onClick={e => { e.stopPropagation(); prev(); }} aria-label="Previous photo"
+                      className="absolute left-3 lg:left-4 top-1/2 -translate-y-1/2 w-9 h-9 lg:w-10 lg:h-10 bg-white/80 hover:bg-white backdrop-blur-sm text-dark flex items-center justify-center shadow-lg opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
                       <ChevronLeft size={20} />
                     </button>
-                    <button onClick={e => { e.stopPropagation(); next(); }}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10  bg-white/80 hover:bg-white backdrop-blur-sm text-dark flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={e => { e.stopPropagation(); next(); }} aria-label="Next photo"
+                      className="absolute right-3 lg:right-4 top-1/2 -translate-y-1/2 w-9 h-9 lg:w-10 lg:h-10 bg-white/80 hover:bg-white backdrop-blur-sm text-dark flex items-center justify-center shadow-lg opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
                       <ChevronRight size={20} />
                     </button>
                   </>
                 )}
-                <div className="absolute bottom-4 right-4 bg-dark/70 backdrop-blur-md text-white text-[12px] font-medium px-3 py-1.5 ">
+                <div className="absolute bottom-4 right-4 bg-dark/70 backdrop-blur-md text-white text-[12px] font-medium px-3 py-1.5 flex items-center gap-1.5">
                   {imgIndex + 1} / {imgs.length}
+                  {imgs.length > 1 && <ChevronRight size={12} className="lg:hidden opacity-70" />}
                 </div>
               </div>
 
@@ -321,21 +359,27 @@ const CarDetailSEO: React.FC = () => {
                   the old 4-column grid stacked ~4 rows of thumbs and pushed
                   the price and CTAs two screens down. Grid from sm: up. */}
               {imgs.length > 1 && (
-                <div className="flex overflow-x-auto scrollbar-hide sm:grid sm:grid-cols-6 lg:grid-cols-8 gap-2 mt-3 pb-1 sm:pb-0">
-                  {imgs.slice(0, showAllPhotos ? imgs.length : 15).map((img, i) => (
-                    <button
-                      key={i}
-                      onClick={() => setImgIndex(i)}
-                      className={`w-20 shrink-0 sm:w-auto sm:shrink aspect-[4/3] overflow-hidden border-2 transition-all ${i === imgIndex ? 'border-coral' : 'border-transparent opacity-60 hover:opacity-100'}`}
-                    >
-                      <img src={getCloudinaryThumbnail(img.url, 200)} alt="" className="w-full h-full object-cover" loading="lazy" onError={handleImageError} />
-                    </button>
-                  ))}
-                  {!showAllPhotos && imgs.length > 15 && (
-                    <button onClick={() => setShowAllPhotos(true)} className="w-20 shrink-0 sm:w-auto sm:shrink aspect-[4/3] bg-muted flex items-center justify-center text-[12px] font-semibold text-text-secondary hover:text-gold-dark transition-colors border-2 border-transparent hover:border-coral">
-                      +{imgs.length - 15} More
-                    </button>
-                  )}
+                <div className="relative">
+                  <div className="flex overflow-x-auto scrollbar-hide sm:grid sm:grid-cols-6 lg:grid-cols-8 gap-2 mt-3 pb-1 sm:pb-0">
+                    {imgs.slice(0, showAllPhotos ? imgs.length : 15).map((img, i) => (
+                      <button
+                        key={i}
+                        ref={i === imgIndex ? activeThumbRef : undefined}
+                        onClick={() => setImgIndex(i)}
+                        className={`w-20 shrink-0 sm:w-auto sm:shrink aspect-[4/3] overflow-hidden border-2 transition-all ${i === imgIndex ? 'border-coral' : 'border-transparent opacity-60 hover:opacity-100'}`}
+                      >
+                        <img src={getCloudinaryThumbnail(img.url, 200)} alt="" className="w-full h-full object-cover" loading="lazy" onError={handleImageError} />
+                      </button>
+                    ))}
+                    {!showAllPhotos && imgs.length > 15 && (
+                      <button onClick={() => setShowAllPhotos(true)} className="w-20 shrink-0 sm:w-auto sm:shrink aspect-[4/3] bg-muted flex items-center justify-center text-[12px] font-semibold text-text-secondary hover:text-gold-dark transition-colors border-2 border-transparent hover:border-coral">
+                        +{imgs.length - 15} More
+                      </button>
+                    )}
+                  </div>
+                  {/* Right-edge fade on the phone strip — the visual cue that
+                      the thumbnails continue past the screen edge. */}
+                  <div className="sm:hidden pointer-events-none absolute right-0 top-3 bottom-1 w-12 bg-gradient-to-l from-white to-transparent" />
                 </div>
               )}
             </div>

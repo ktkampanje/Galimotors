@@ -124,6 +124,7 @@ prisma/dev.db.backup-*
 # Full-database exports (npm run data:export) — these carry real customer
 # names and phone numbers. Used to migrate data to Neon; never commit them.
 data-export*.json
+fresh-start-backup-*.json
 
 # Vercel
 .vercel

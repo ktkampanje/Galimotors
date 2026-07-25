@@ -1,6 +1,7 @@
 // Opens WhatsApp chats with the business, with car-aware prefilled messages.
 import axios from 'axios';
 import { API_BASE_URL } from './api';
+import { generateCarUrl } from './seoRoutes';
 
 interface ContactOptions {
   phone: string;
@@ -126,9 +127,22 @@ export class ContactService {
     if (specs.length > 0) {
       message += '\n' + specs.join(', ');
     }
-    
+
+    // The unique identifier. Specs alone cannot distinguish two similar
+    // imports (same model, year and price is common stock); the ref is the
+    // car id prefix, which the admin inventory search matches directly, and
+    // the link reopens the exact listing.
+    if (car.id) {
+      message += `\nRef: ${String(car.id).split('-')[0].toUpperCase()}`;
+      try {
+        message += `\n${window.location.origin}${generateCarUrl(car)}`;
+      } catch {
+        /* URL builder needs maker/model — ref alone still identifies it */
+      }
+    }
+
     message += '\n\nCan you provide more details and confirm availability?';
-    
+
     return message;
   }
 
@@ -139,13 +153,23 @@ export class ContactService {
     const bodyType = car.bodyType?.name || '';
 
     let message = `Hi, I am ${customerName} and would like to schedule a viewing for the ${title}`;
-    
+
     if (bodyType) {
       message += ` (${bodyType})`;
     }
-    
-    message += '.\n\nWhen would be a good time?';
-    
+    message += '.';
+
+    // Same unique identifier as the inquiry message — a viewing request for
+    // "the Vezel" must never end up scheduling the wrong Vezel.
+    if (car.id) {
+      message += `\nRef: ${String(car.id).split('-')[0].toUpperCase()}`;
+      try {
+        message += `\n${window.location.origin}${generateCarUrl(car)}`;
+      } catch { /* ref alone still identifies it */ }
+    }
+
+    message += '\n\nWhen would be a good time?';
+
     return message;
   }
 
