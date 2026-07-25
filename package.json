@@ -1,5 +1,5 @@
 {
-  "name": "galimotors-monorepo",
+  "name": "galimotors",
   "private": true,
   "workspaces": [
     "admin-panel",
