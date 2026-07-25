@@ -121,6 +121,9 @@ prisma/dev.db.backup-*
 # Pre-change working copies of source trees
 **/.backup-pre-*
 
+# Local test assets (BE FORWARD photos + spec sheets) — never in the repo
+Cars for testing/
+
 # Full-database exports (npm run data:export) — these carry real customer
 # names and phone numbers. Used to migrate data to Neon; never commit them.
 data-export*.json
