@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
-import { AlertCircle, CheckCircle2, Info, AlertTriangle } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Info } from 'lucide-react';
 
 type ModalType = 'alert' | 'confirm';
 type ModalVariant = 'info' | 'success' | 'warning' | 'error' | 'danger';
@@ -108,64 +108,58 @@ export const ModalProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   );
 };
 
+/**
+ * Dialog in the site's own grammar: the accent bar + bold title every
+ * section header uses, left-aligned text, right-aligned natural-width
+ * buttons, sharp corners. The old centered icon-in-a-circle with heavy
+ * rounding read as an unstyled template default.
+ */
 const Popup: React.FC<{ modal: ModalState; onClose: (value: boolean) => void }> = ({ modal, onClose }) => {
-  const getIcon = () => {
-    switch (modal.variant) {
-      case 'success': return <CheckCircle2 className="text-success" size={24} />;
-      case 'warning': return <AlertTriangle className="text-warning" size={24} />;
-      case 'error':
-      case 'danger': return <AlertCircle className="text-danger" size={24} />;
-      default: return <Info className="text-gold-dark" size={24} />;
-    }
-  };
-
-  const getAccentColor = () => {
-    switch (modal.variant) {
-      case 'success': return 'border-t-success';
-      case 'warning': return 'border-t-warning';
-      case 'error':
-      case 'danger': return 'border-t-danger';
-      default: return 'border-t-gold';
-    }
-  };
+  const destructive = modal.variant === 'danger' || modal.variant === 'error';
+  const accent =
+    destructive ? 'bg-danger'
+    : modal.variant === 'success' ? 'bg-success'
+    : modal.variant === 'warning' ? 'bg-warning'
+    : 'bg-gold';
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-md animate-fade-in shadow-2xl">
-      <div className={`bg-white w-full max-w-sm rounded-[24px] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.3)] overflow-hidden border-t-4 ${getAccentColor()} animate-fade-up`}>
-        <div className="p-8">
-          <div className="flex flex-col items-center text-center gap-4">
-            <div className="p-4 bg-muted rounded-2xl">
-              {getIcon()}
-            </div>
-            <div className="space-y-2">
-              <h3 className="text-lg font-bold text-dark tracking-tight">
-                {modal.title}
-              </h3>
-              <p className="text-sm font-medium text-text-secondary leading-relaxed px-2">
-                {modal.message}
-              </p>
-            </div>
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-dark/50 backdrop-blur-sm animate-fade-in"
+      onClick={() => onClose(modal.type === 'alert')}
+    >
+      <div
+        className="bg-white w-full max-w-md shadow-2xl border border-border animate-fade-up"
+        onClick={e => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+      >
+        <div className="px-6 pt-5 pb-4">
+          <div className="flex items-center gap-2.5 mb-2.5">
+            <span className={`w-1 h-5 shrink-0 ${accent}`} aria-hidden="true" />
+            <h3 className="text-[16px] font-bold text-dark tracking-tight">{modal.title}</h3>
           </div>
+          <p className="text-[13.5px] text-text-secondary leading-relaxed pl-[14px]">
+            {modal.message}
+          </p>
         </div>
 
-        <div className="p-6 bg-muted/30 flex gap-3 border-t border-border/50">
+        <div className="px-6 py-4 border-t border-border flex justify-end gap-2.5">
           {modal.type === 'confirm' && (
             <button
               onClick={() => onClose(false)}
-              className="flex-1 px-4 py-3.5 bg-white border border-border text-dark text-sm font-bold rounded-xl hover:bg-muted active:scale-[0.98] transition-all duration-200"
+              className="px-5 py-2.5 bg-white border border-border text-dark text-[13px] font-semibold hover:border-dark transition-colors"
             >
               {modal.cancelLabel || 'Cancel'}
             </button>
           )}
           <button
             onClick={() => onClose(true)}
-            className={`flex-1 px-4 py-3.5 text-white text-sm font-bold rounded-xl active:scale-[0.98] transition-all duration-200 shadow-lg ${
-              modal.variant === 'danger' || modal.variant === 'error' 
-                ? 'bg-danger hover:opacity-90 shadow-danger/20'
-                : 'bg-dark hover:bg-black shadow-dark/20'
+            autoFocus
+            className={`px-5 py-2.5 text-white text-[13px] font-semibold transition-colors ${
+              destructive ? 'bg-danger hover:opacity-90' : 'bg-coral hover:bg-coral-dark'
             }`}
           >
-            {modal.confirmLabel || (modal.type === 'confirm' ? 'Confirm' : 'Got it')}
+            {modal.confirmLabel || (modal.type === 'confirm' ? 'Confirm' : 'OK')}
           </button>
         </div>
       </div>
