@@ -590,10 +590,13 @@ const HomePage: React.FC = () => {
 
       {/* ── Footer ───────────────────────────────────── */}
       <footer className="bg-gradient-to-b from-dark to-dark-muted text-white mt-8 border-t border-dark-muted">
-        <div className="page-container py-8 sm:py-12 md:py-10 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-y-7 sm:gap-y-10 gap-x-6 md:gap-8 text-[13px] md:text-[12px]">
-          
+        {/* Mobile: two columns — Quick Links and Support sit side by side,
+            brand and contact span full width. Stacking everything in one
+            column made the footer three screens of mostly whitespace. */}
+        <div className="page-container py-7 sm:py-12 md:py-10 grid grid-cols-2 md:grid-cols-4 gap-y-6 sm:gap-y-10 gap-x-5 md:gap-8 text-[13px] md:text-[12px]">
+
           {/* Brand Info */}
-          <div className="md:col-span-1">
+          <div className="col-span-2 md:col-span-1">
             <div className="flex items-center gap-2.5 mb-3">
               <div className="w-8 h-8 bg-coral flex items-center justify-center ring-1 ring-white/10">
                 <span className="text-gold font-extrabold text-[14px]">G</span>
@@ -661,7 +664,7 @@ const HomePage: React.FC = () => {
           </div>
 
           {/* Contact */}
-          <div>
+          <div className="col-span-2 md:col-span-1">
             <p className="font-bold text-white text-[13px] mb-3 tracking-wide">Contact Us</p>
             {/* Contact rows are links, not plain text — on a phone the number
                 should dial and the address should open maps. */}
