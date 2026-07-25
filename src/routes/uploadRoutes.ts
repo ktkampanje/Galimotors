@@ -86,8 +86,9 @@ router.post('/receipt', inquiryRateLimit, async (req, res) => {
   try {
     const { image } = req.body;
 
-    if (typeof image !== 'string' || !image.startsWith('data:image/')) {
-      return res.status(400).json({ error: 'A single base64 image (data:image/...) is required' });
+    const isPdf = typeof image === 'string' && image.startsWith('data:application/pdf');
+    if (typeof image !== 'string' || (!image.startsWith('data:image/') && !isPdf)) {
+      return res.status(400).json({ error: 'Receipt must be an image or a PDF (data URI)' });
     }
     // base64 inflates ~4/3: 4.2M chars ≈ 3.1MB decoded.
     if (image.length > 4_200_000) {
@@ -108,9 +109,11 @@ router.post('/receipt', inquiryRateLimit, async (req, res) => {
 
     const result = await cloudinary.uploader.upload(image, {
       folder: 'galimotors/receipts',
-      // Receipts are read by a human once — 1200px q_auto keeps them legible
-      // and small on the free tier.
-      transformation: [{ width: 1200, crop: 'limit' }, { quality: 'auto:good' }, { fetch_format: 'auto' }],
+      ...(isPdf
+        ? { resource_type: 'image' as const, format: 'pdf' }
+        // Image receipts are read by a human once — 1200px q_auto keeps
+        // them legible and small on the free tier.
+        : { transformation: [{ width: 1200, crop: 'limit' }, { quality: 'auto:good' }, { fetch_format: 'auto' }] }),
     });
 
     return res.json({ url: result.secure_url });

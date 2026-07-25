@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import {
   Image as ImageIcon, MapPin, User, Phone, CheckCircle2,
-  ChevronRight, AlertCircle, ArrowLeft, Check
+  ChevronRight, AlertCircle, ArrowLeft, Check, FileText
 } from 'lucide-react';
 import { useModal } from '../components/ui/ModalContext';
 import { api } from '../lib/api';
@@ -225,18 +225,21 @@ const BookViewing: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 10 * 1024 * 1024) {
-      showAlert({ title: 'File Too Large', message: 'Please select an image smaller than 10MB', variant: 'warning' });
+    const isPdf = file.type === 'application/pdf';
+    if (!file.type.startsWith('image/') && !isPdf) {
+      showAlert({ title: 'Invalid File', message: 'Please select an image or a PDF receipt', variant: 'warning' });
       return;
     }
-    if (!file.type.startsWith('image/')) {
-      showAlert({ title: 'Invalid File', message: 'Please select an image file', variant: 'warning' });
+    // PDFs cannot be compressed client-side, so their cap must respect the
+    // upload body limit directly; images shrink to ~0.8MB below.
+    if (file.size > (isPdf ? 3 * 1024 * 1024 : 10 * 1024 * 1024)) {
+      showAlert({ title: 'File Too Large', message: isPdf ? 'Please select a PDF smaller than 3MB' : 'Please select an image smaller than 10MB', variant: 'warning' });
       return;
     }
 
     // Receipts are photos of text — 1280px is ample. Compressing before the
     // base64 upload cuts both the customer's data cost and Cloudinary storage.
-    const compressed = await imageCompression(file, {
+    const compressed = isPdf ? file : await imageCompression(file, {
       maxSizeMB: 0.8,
       maxWidthOrHeight: 1280,
       useWebWorker: true,
@@ -710,18 +713,26 @@ const BookViewing: React.FC = () => {
             <div className="border-2 border-dashed border-border bg-white hover:bg-muted transition-colors relative group overflow-hidden">
               <input
                 type="file"
-                accept="image/*"
+                accept="image/*,application/pdf"
                 onChange={handleImageUpload}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
               />
 
               {popImagePreview ? (
+                popImagePreview.startsWith('data:application/pdf') ? (
+                  <div className="relative h-56 w-full p-2 flex flex-col items-center justify-center gap-2 text-text-secondary">
+                    <FileText size={40} className="text-gold-dark" />
+                    <span className="text-[13px] font-semibold text-dark max-w-full truncate px-4">{popImageFile?.name || 'PDF receipt'}</span>
+                    <span className="text-[11px]">PDF attached — tap to change</span>
+                  </div>
+                ) : (
                 <div className="relative h-56 w-full p-2">
                   <img src={popImagePreview} alt="Proof of payment" className="w-full h-full object-contain" />
                   <div className="absolute inset-0 bg-dark/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity m-2 backdrop-blur-[2px]">
                     <span className="bg-white text-dark font-bold px-4 py-2 text-xs">Change Image</span>
                   </div>
                 </div>
+                )
               ) : (
                 <div className="h-56 flex flex-col items-center justify-center text-center p-6">
                   <div className="w-14 h-14 bg-muted flex items-center justify-center mb-4 text-text-tertiary group-hover:text-gold-dark transition-colors">

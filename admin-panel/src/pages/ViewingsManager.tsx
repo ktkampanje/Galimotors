@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Eye, Search, CheckCircle, XCircle, MapPin, Calendar, CheckSquare, X, MessageCircle, ArrowLeft } from 'lucide-react';
+import { Eye, Search, CheckCircle, XCircle, MapPin, Calendar, CheckSquare, X, MessageCircle, ArrowLeft, FileText } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useModal } from '../components/ui/ModalContext';
@@ -458,9 +458,19 @@ const ViewingsManager: React.FC = () => {
                     {selectedViewing.proofOfPaymentUrl ? (
                       <div className="mb-4">
                         <span className="text-xs font-medium text-gray-500 block mb-2">Proof of Payment</span>
+                        {/\.pdf($|\?)/i.test(selectedViewing.proofOfPaymentUrl) ? (
+                          <a href={selectedViewing.proofOfPaymentUrl} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-lg border border-gray-200 p-4 hover:border-gold-dark hover:bg-gold-light/30 transition-colors">
+                            <FileText size={22} className="text-gold-dark shrink-0" />
+                            <div className="min-w-0">
+                              <p className="text-sm font-bold text-gray-900">PDF receipt</p>
+                              <p className="text-xs text-gray-500">Tap to open the document</p>
+                            </div>
+                          </a>
+                        ) : (
                         <a href={selectedViewing.proofOfPaymentUrl} target="_blank" rel="noreferrer" className="block rounded-lg overflow-hidden border border-gray-200 hover:opacity-90 transition-opacity">
                            <img src={selectedViewing.proofOfPaymentUrl} alt="Proof of Payment" className="w-full h-40 object-cover" />
                         </a>
+                        )}
                       </div>
                     ) : (
                       <div className="p-4 bg-gray-50 rounded-lg text-center text-sm font-medium text-gray-500 border border-gray-100 mb-4">

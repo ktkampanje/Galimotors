@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle, DollarSign, X } from 'lucide-react';
+import { CheckCircle, DollarSign, X, FileText } from 'lucide-react';
 import { api } from '../lib/api';
 
 interface PendingPayment {
@@ -208,11 +208,18 @@ const PaymentVerificationQueue: React.FC = () => {
                 
                 <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex items-center justify-center relative min-h-[300px]">
                   {selectedPayment.proofOfPaymentUrl ? (
+                    /\.pdf($|\?)/i.test(selectedPayment.proofOfPaymentUrl) ? (
+                      <a href={selectedPayment.proofOfPaymentUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center justify-center gap-3 text-gray-600 hover:text-gray-900 transition-colors p-8">
+                        <FileText size={56} className="text-gold-dark" />
+                        <span className="text-sm font-bold">PDF receipt — click to open</span>
+                      </a>
+                    ) : (
                     <img
                       src={selectedPayment.proofOfPaymentUrl}
                       alt="Proof of Payment"
                       className="w-full h-full object-contain p-4"
                     />
+                    )
                   ) : (
                     <div className="flex flex-col items-center justify-center text-gray-400">
                       <DollarSign size={48} className="mb-4 opacity-50" />
