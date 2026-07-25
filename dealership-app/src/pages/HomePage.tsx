@@ -52,6 +52,7 @@ const HomePage: React.FC = () => {
 
   const [featuredCars, setFeaturedCars] = useState<Car[]>([]);
   const [previewCars, setPreviewCars]   = useState<Car[]>([]);
+  const [categoryStrips, setCategoryStrips] = useState<Array<{ id: string; name: string; cars: Car[] }>>([]);
   const [recentCars, setRecentCars]     = useState<Car[]>([]);
   const [additionalCars, setAdditionalCars] = useState<Car[]>([]);
   const [loading, setLoading]           = useState(true);
@@ -106,6 +107,7 @@ const HomePage: React.FC = () => {
           });
           setFeaturedCars([]);
           setPreviewCars([]);
+          setCategoryStrips([]);
           const items = res.data.cars || res.data || [];
           setRecentCars(Array.isArray(items) ? items : []);
           setHasMore(res.data.pagination?.hasMore ?? false);
@@ -120,12 +122,13 @@ const HomePage: React.FC = () => {
           setFeaturedCars((res.data.featured || []).slice(0, 8));
           setPreviewCars((res.data.preview || []).slice(0, 10));
           setRecentCars((res.data.recent || []).slice(0, 8));
+          setCategoryStrips(res.data.sections || []);
           setHasMore(false);
           setTotalCars(res.data.total ?? 0);
           setAdditionalCars([]);
           setCurrentPage(1);
         }
-      } catch { setFeaturedCars([]); setPreviewCars([]); setRecentCars([]); }
+      } catch { setFeaturedCars([]); setPreviewCars([]); setRecentCars([]); setCategoryStrips([]); }
       finally { setLoading(false); }
     };
     fetch();
@@ -503,6 +506,18 @@ const HomePage: React.FC = () => {
             {!isGrid && <DistrictStrip />}
             {!isGrid && <MakeStrip />}
             {!isGrid && <BodyTypeStrip />}
+
+            {/* Admin-ordered category strips (drag-to-reorder in the admin
+                Categories screen). Each is ONE row — the strip pattern, not
+                the old multi-row grids — with a clean name-only title. */}
+            {!isGrid && !loading && categoryStrips.map(strip => (
+              <FeaturedCarousel
+                key={strip.id}
+                cars={strip.cars}
+                title={strip.name}
+                seeAllHref={`/cars?categoryId=${strip.id}`}
+              />
+            ))}
 
             {/* Loading (preview slot) */}
             {loading && <SkeletonGrid />}

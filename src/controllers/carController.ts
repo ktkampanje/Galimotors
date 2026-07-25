@@ -1244,7 +1244,7 @@ export const getHomepageCars = async (req: Request, res: Response) => {
   try {
     const availableWhere = { status: "AVAILABLE", deletedAt: null } as const;
 
-    const [featured, recent, preview, total] = await Promise.all([
+    const [featured, recent, preview, total, categoryRows] = await Promise.all([
       // Featured strip (8, curated via the admin's Featured flag)
       prisma.car.findMany({
         where: { ...availableWhere, isFeatured: true },
@@ -1275,10 +1275,35 @@ export const getHomepageCars = async (req: Request, res: Response) => {
 
       // Total count for the "Browse all N vehicles" CTA
       prisma.car.count({ where: availableWhere }),
+
+      // One strip per admin category, in the drag-to-reorder sortOrder from
+      // the admin Categories screen, 8 newest-assigned cars each. Rendered
+      // as ONE-ROW strips between the browse tiles and the All Vehicles
+      // preview — the admin owns which categories show and in what order.
+      prisma.category.findMany({
+        orderBy: { sortOrder: "asc" },
+        select: {
+          id: true,
+          name: true,
+          cars: {
+            where: { car: availableWhere },
+            orderBy: { assignedAt: "desc" },
+            take: 8,
+            select: { car: { select: HOMEPAGE_CARD_SELECT } },
+          },
+        },
+      }),
     ]);
 
+    const sections = categoryRows
+      .map((c) => ({ id: c.id, name: c.name, cars: c.cars.map((cc) => cc.car) }))
+      // Empty categories render nothing; "New Arrival" is covered by the
+      // automatic New Arrivals strip — a second identical row would be the
+      // exact duplication this page was decongested to remove.
+      .filter((s) => s.cars.length > 0 && !/new\s*arrivals?/i.test(s.name));
+
     res.set("Cache-Control", "public, max-age=300"); // Cache for 5 minutes
-    res.json({ featured, recent, preview, total, hasMore: total > 8 });
+    res.json({ featured, recent, preview, sections, total, hasMore: total > 8 });
   } catch (error) {
     console.error("Homepage cars error:", error);
     res.status(500).json({ message: "Failed to fetch homepage cars" });
