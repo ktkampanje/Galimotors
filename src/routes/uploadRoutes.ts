@@ -116,7 +116,19 @@ router.post('/receipt', inquiryRateLimit, async (req, res) => {
         : { transformation: [{ width: 1200, crop: 'limit' }, { quality: 'auto:good' }, { fetch_format: 'auto' }] }),
     });
 
-    return res.json({ url: result.secure_url });
+    // This Cloudinary account blocks raw PDF DELIVERY (default security
+    // setting — uploads succeed, fetching the .pdf back returns 401,
+    // verified live). A JPG derived from the PDF's first page delivers
+    // fine, so that is the URL everyone gets: admins see PDF receipts
+    // exactly like photo receipts. Trade-off: only page 1 is visible —
+    // payment receipts are single-page in practice.
+    const url = isPdf
+      ? result.secure_url
+          .replace('/upload/', '/upload/pg_1,w_1200,c_limit,q_auto:good/')
+          .replace(/\.pdf$/i, '.jpg')
+      : result.secure_url;
+
+    return res.json({ url });
   } catch (error) {
     console.error('Receipt upload error:', error);
     res.status(500).json({ error: 'Failed to upload receipt' });
