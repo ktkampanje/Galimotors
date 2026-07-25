@@ -22,12 +22,11 @@ interface Car {
   district?: string; negotiable?: boolean; urgentSaleBadge?: boolean;
   images: { url: string; isPrimary: boolean }[];
   maker?: { name: string }; model?: { name: string };
-  categories?: Array<{ category: { name: string; emoji: string; color: string; bgColor: string } }>;
 }
 
 const SkeletonGrid: React.FC = () => (
   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-x-4 gap-y-6 stagger-children">
-    {Array.from({ length: 8 }).map((_, i) => (
+    {Array.from({ length: 10 }).map((_, i) => (
       <div key={i}>
         <div className="aspect-[4/3] bg-muted skeleton mb-3" />
         <div className="h-3 bg-muted skeleton w-1/3 mb-2" />
@@ -38,14 +37,6 @@ const SkeletonGrid: React.FC = () => (
     ))}
   </div>
 );
-
-interface CategorySection {
-  id: string;
-  name: string;
-  emoji: string;
-  slug: string;
-  cars: Car[];
-}
 
 const HomePage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -60,7 +51,7 @@ const HomePage: React.FC = () => {
   const { whatsappLink, phoneDisplay, phoneLink, email, facebookUrl, businessAddress } = useSettings();
 
   const [featuredCars, setFeaturedCars] = useState<Car[]>([]);
-  const [sections, setSections]         = useState<CategorySection[]>([]);
+  const [previewCars, setPreviewCars]   = useState<Car[]>([]);
   const [recentCars, setRecentCars]     = useState<Car[]>([]);
   const [additionalCars, setAdditionalCars] = useState<Car[]>([]);
   const [loading, setLoading]           = useState(true);
@@ -114,7 +105,7 @@ const HomePage: React.FC = () => {
             params: { ...params, status: 'AVAILABLE', limit: 24 },
           });
           setFeaturedCars([]);
-          setSections([]);
+          setPreviewCars([]);
           const items = res.data.cars || res.data || [];
           setRecentCars(Array.isArray(items) ? items : []);
           setHasMore(res.data.pagination?.hasMore ?? false);
@@ -122,18 +113,19 @@ const HomePage: React.FC = () => {
           setAdditionalCars([]);
           setCurrentPage(1);
         } else {
-          // Curated showroom: featured + one 8-car row per admin category +
-          // recently added. Nothing else loads until the customer asks.
+          // Curated showroom: Featured strip, New Arrivals strip, and a
+          // two-row All Vehicles preview. Client-side slices keep the row
+          // caps honest even against a stale-cached payload shape.
           const res = await axios.get(`${API_BASE_URL}/cars/homepage`);
-          setFeaturedCars(res.data.featured || []);
-          setSections(res.data.sections || []);
-          setRecentCars(res.data.recent || []);
+          setFeaturedCars((res.data.featured || []).slice(0, 8));
+          setPreviewCars((res.data.preview || []).slice(0, 10));
+          setRecentCars((res.data.recent || []).slice(0, 8));
           setHasMore(false);
           setTotalCars(res.data.total ?? 0);
           setAdditionalCars([]);
           setCurrentPage(1);
         }
-      } catch { setFeaturedCars([]); setSections([]); setRecentCars([]); }
+      } catch { setFeaturedCars([]); setPreviewCars([]); setRecentCars([]); }
       finally { setLoading(false); }
     };
     fetch();
@@ -187,6 +179,8 @@ const HomePage: React.FC = () => {
     searchParams.forEach((value, key) => {
       if (key === 'search') {
         filters.push({ key, label: 'Search', value, displayValue: `"${value}"` });
+      } else if (key === 'featured') {
+        filters.push({ key, label: 'Featured', value, displayValue: 'Featured' });
       } else if (key === 'condition') {
         const display = value === 'IT' ? 'Foreign Used (IT)' : value;
         filters.push({ key, label: 'Condition', value, displayValue: display });
@@ -202,7 +196,7 @@ const HomePage: React.FC = () => {
         filters.push({ key, label: 'Body Type', value, displayValue: display });
       } else if (key === 'categoryId') {
         const category = categories.find(c => c.id === value);
-        const display = category ? `${category.emoji} ${category.name}`.trim() : 'Selected Category';
+        const display = category ? category.name : 'Selected Category';
         filters.push({ key, label: 'Category', value, displayValue: display });
       } else if (key === 'transmission') {
         const display = value === 'AUTOMATIC' ? 'Automatic' : 'Manual';
@@ -270,7 +264,7 @@ const HomePage: React.FC = () => {
 
     if (urls.length === 0) {
       const derived: string[] = [];
-      for (const car of [...featuredCars, ...recentCars, ...sections.flatMap(s => s.cars)]) {
+      for (const car of [...featuredCars, ...recentCars, ...previewCars]) {
         const img = getPrimaryImage(car.images);
         if (img?.url && !derived.includes(img.url)) derived.push(img.url);
         if (derived.length >= 8) break;
@@ -284,7 +278,7 @@ const HomePage: React.FC = () => {
     const tiled: string[] = [];
     while (tiled.length < 10) tiled.push(...urls);
     return tiled;
-  }, [adminHeroImages, featuredCars, recentCars, sections]);
+  }, [adminHeroImages, featuredCars, recentCars, previewCars]);
 
   /* ── render ── */
   return (
@@ -483,44 +477,43 @@ const HomePage: React.FC = () => {
             </div>
             )}
 
-            {/* Curated order: districts first — browsing by district is the
-                distinctly Malawian entry point — then best stock (Featured),
-                then the icon strips, then everything else. */}
-            {!isGrid && <DistrictStrip />}
-
-            {!isGrid && !loading && featuredCars.length > 0 && (
-              <div className="mb-8">
-                <FeaturedCarousel cars={featuredCars} />
-              </div>
+            {/* ── Curated showroom (/), owner-specified order ──
+                Featured strip → New Arrivals strip → the three browse strips
+                → a TWO-ROW All Vehicles preview → Browse-all CTA. One row
+                per car section, no per-category rows, no card pills — the
+                catalog does the talking. Strips render their own skeletons
+                so nothing pops in above already-visible sections. */}
+            {!isGrid && (
+              <FeaturedCarousel
+                cars={featuredCars}
+                loading={loading}
+                seeAllHref="/cars?featured=true"
+              />
             )}
 
+            {!isGrid && (
+              <FeaturedCarousel
+                cars={recentCars}
+                loading={loading}
+                title="New Arrivals"
+                seeAllHref="/cars"
+              />
+            )}
+
+            {!isGrid && <DistrictStrip />}
             {!isGrid && <MakeStrip />}
             {!isGrid && <BodyTypeStrip />}
 
-            {/* Recently viewed */}
-            {!isGrid && <RecentlyViewedSection />}
-
-            {/* Loading */}
+            {/* Loading (preview slot) */}
             {loading && <SkeletonGrid />}
 
-            {/* ── Curated showroom (/) — 8-car rows, no infinite scroll ── */}
             {!isGrid && !loading && (
               <>
-                {/* One row per admin category, in admin sort order; "See all"
-                    opens the full grid pre-filtered to that category. */}
-                {sections.map(section => (
+                {previewCars.length > 0 && (
                   <CarGridSection
-                    key={section.id}
-                    title={`${section.emoji} ${section.name}`.trim()}
-                    cars={section.cars}
-                    seeMoreLink={`/cars?categoryId=${section.id}`}
-                  />
-                ))}
-
-                {recentCars.length > 0 && (
-                  <CarGridSection
-                    title="Recently Added"
-                    cars={recentCars}
+                    title="All Vehicles"
+                    cars={previewCars}
+                    maxRows={2}
                     seeMoreLink="/cars"
                   />
                 )}
@@ -535,6 +528,10 @@ const HomePage: React.FC = () => {
                     </Link>
                   </div>
                 )}
+
+                {/* Returning-user utility at the natural stopping point —
+                    self-hides for guests. */}
+                <RecentlyViewedSection />
               </>
             )}
 
@@ -573,13 +570,21 @@ const HomePage: React.FC = () => {
               </>
             )}
 
-            {/* Empty */}
+            {/* Empty — filter copy only makes sense in grid mode; on the
+                showroom it used to tell visitors to clear filters they
+                never set. */}
             {!loading && recentCars.length === 0 && (
               <div className="h-full flex flex-col justify-center items-center p-8  border border-border bg-muted/20 text-center">
                 <Search size={32} className="text-text-tertiary mb-3 opacity-40" />
-                <p className="text-[14px] font-medium text-text-secondary">No vehicles found</p>
-                <p className="text-[12px] text-text-tertiary mt-1">Try adjusting or clearing your filters to see more results.</p>
-                <button onClick={clearAllFilters} className="btn-primary mt-4">Clear All Filters</button>
+                <p className="text-[14px] font-medium text-text-secondary">
+                  {isGrid ? 'No vehicles found' : 'No vehicles available yet'}
+                </p>
+                <p className="text-[12px] text-text-tertiary mt-1">
+                  {isGrid ? 'Try adjusting or clearing your filters to see more results.' : 'Check back soon — new stock is on the way.'}
+                </p>
+                {isGrid && (
+                  <button onClick={clearAllFilters} className="btn-primary mt-4">Clear All Filters</button>
+                )}
               </div>
             )}
           </div>

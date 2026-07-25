@@ -406,7 +406,7 @@ const CarDetailSEO: React.FC = () => {
                         <div className="flex flex-wrap gap-2">
                           {car.dutyPaid && <span className="bg-coral text-white text-[11px] font-semibold px-3 py-1">Duty Paid</span>}
                           {car.logbookAvailable && <span className="bg-muted text-dark text-[11px] font-semibold px-3 py-1 border border-border">Blue Book Available</span>}
-                          {car.platformInspectedBadge && <span className="bg-gold text-dark text-[11px] font-semibold px-3 py-1">✓ GaliMotors Verified</span>}
+                          {car.platformInspectedBadge && <span className="bg-gold text-dark text-[11px] font-semibold px-3 py-1">GaliMotors Verified</span>}
                         </div>
                         {car.categories && car.categories.length > 0 && (
                           <CategoryBadges categories={car.categories} size="sm" />

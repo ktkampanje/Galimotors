@@ -1217,140 +1217,68 @@ export const getCarRankingExplanation = async (req: Request, res: Response) => {
 };
 
 // Optimized endpoint for homepage - loads minimal data for fast initial page load
+//
+// Shape: { featured, recent, preview, total, hasMore }.
+// The old per-category `sections` rows are gone — they tripled the label
+// noise (heading + ribbon + pill for the same fact) and made page length
+// scale with the number of admin categories. Categories still power the
+// /cars sidebar filter; the homepage is now a fixed, bounded showroom.
+const HOMEPAGE_CARD_SELECT = {
+  id: true,
+  title: true,
+  basePrice: true,
+  year: true,
+  mileage: true,
+  district: true,
+  negotiable: true,
+  urgentSaleBadge: true,
+  maker: { select: { name: true } },
+  model: { select: { name: true } },
+  images: {
+    where: { isPrimary: true },
+    select: { url: true, isPrimary: true },
+  },
+} as const;
+
 export const getHomepageCars = async (req: Request, res: Response) => {
   try {
-    // Load only essential data for homepage sections
-    const [featured, recent, total, categorySections] = await Promise.all([
-      // Featured cars (8 cars with only primary image)
+    const availableWhere = { status: "AVAILABLE", deletedAt: null } as const;
+
+    const [featured, recent, preview, total] = await Promise.all([
+      // Featured strip (8, curated via the admin's Featured flag)
       prisma.car.findMany({
-        where: {
-          status: "AVAILABLE",
-          isFeatured: true,
-          deletedAt: null,
-        },
-        select: {
-          id: true,
-          title: true,
-          basePrice: true,
-          year: true,
-          mileage: true,
-          district: true,
-          inquiriesCount: true,
-          maker: { select: { name: true } },
-          model: { select: { name: true } },
-          categories: {
-            select: { category: { select: { name: true, emoji: true, color: true, bgColor: true } } },
-            orderBy: { assignedAt: 'desc' },
-          },
-          images: {
-            where: { isPrimary: true },
-            select: { url: true, isPrimary: true },
-          },
-        },
+        where: { ...availableWhere, isFeatured: true },
+        select: HOMEPAGE_CARD_SELECT,
         take: 8,
         orderBy: { createdAt: "desc" },
       }),
 
-      // Recently added (one curated row of 8 — the homepage is a showroom,
-      // not the full list; /cars carries the complete filterable grid)
+      // "New Arrivals" strip: newest 8. Field kept as `recent` so a stale
+      // edge-cached payload from the previous shape still feeds the strip.
       prisma.car.findMany({
-        where: {
-          status: "AVAILABLE",
-          deletedAt: null,
-        },
-        select: {
-          id: true,
-          title: true,
-          basePrice: true,
-          year: true,
-          mileage: true,
-          district: true,
-          inquiriesCount: true,
-          urgentSaleBadge: true,
-          platformInspectedBadge: true,
-          maker: { select: { name: true } },
-          model: { select: { name: true } },
-          categories: {
-            select: { category: { select: { name: true, emoji: true, color: true, bgColor: true } } },
-            orderBy: { assignedAt: 'desc' },
-          },
-          images: {
-            where: { isPrimary: true },
-            select: { url: true, isPrimary: true },
-          },
-        },
+        where: availableWhere,
+        select: HOMEPAGE_CARD_SELECT,
         take: 8,
+        orderBy: { createdAt: "desc" },
+      }),
+
+      // "All Vehicles" two-row preview: the NEXT newest cars (9–18), so the
+      // strip and the grid form one continuous sequence with no duplicates,
+      // and "Browse all" continues from car 19.
+      prisma.car.findMany({
+        where: availableWhere,
+        select: HOMEPAGE_CARD_SELECT,
+        skip: 8,
+        take: 10,
         orderBy: { createdAt: "desc" },
       }),
 
       // Total count for the "Browse all N vehicles" CTA
-      prisma.car.count({
-        where: {
-          status: "AVAILABLE",
-          deletedAt: null,
-        },
-      }),
-
-      // One row per admin-managed category, in the drag-to-reorder order set
-      // in the admin panel, each capped at 8 newest-assigned available cars.
-      // "See all" on a row goes to /cars?categoryId=<id>.
-      prisma.category.findMany({
-        orderBy: { sortOrder: "asc" },
-        select: {
-          id: true,
-          name: true,
-          emoji: true,
-          slug: true,
-          cars: {
-            where: { car: { status: "AVAILABLE", deletedAt: null } },
-            orderBy: { assignedAt: "desc" },
-            take: 8,
-            select: {
-              car: {
-                select: {
-                  id: true,
-                  title: true,
-                  basePrice: true,
-                  year: true,
-                  mileage: true,
-                  district: true,
-                  urgentSaleBadge: true,
-                  maker: { select: { name: true } },
-                  model: { select: { name: true } },
-                  categories: {
-                    select: { category: { select: { name: true, emoji: true, color: true, bgColor: true } } },
-                    orderBy: { assignedAt: 'desc' },
-                  },
-                  images: {
-                    where: { isPrimary: true },
-                    select: { url: true, isPrimary: true },
-                  },
-                },
-              },
-            },
-          },
-        },
-      }),
+      prisma.car.count({ where: availableWhere }),
     ]);
 
     res.set("Cache-Control", "public, max-age=300"); // Cache for 5 minutes
-    res.json({
-      featured,
-      recent,
-      // Categories with no available cars are dropped rather than rendering
-      // empty rows; cars flatten out of the junction rows.
-      sections: categorySections
-        .map((c) => ({
-          id: c.id,
-          name: c.name,
-          emoji: c.emoji,
-          slug: c.slug,
-          cars: c.cars.map((cc) => cc.car),
-        }))
-        .filter((s) => s.cars.length > 0),
-      total,
-      hasMore: total > 8,
-    });
+    res.json({ featured, recent, preview, total, hasMore: total > 8 });
   } catch (error) {
     console.error("Homepage cars error:", error);
     res.status(500).json({ message: "Failed to fetch homepage cars" });

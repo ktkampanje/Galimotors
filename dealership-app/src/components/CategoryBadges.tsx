@@ -37,6 +37,9 @@ const CategoryBadges: React.FC<CategoryBadgesProps> = ({
 
   return (
     <div className={`flex flex-wrap gap-1.5 ${className}`}>
+      {/* Name only, sharp corners — the emoji + rounded-pill treatment read
+          as template decoration; these now match the site's other flat
+          colored tags (Duty Paid, Blue Book). Sole consumer: detail page. */}
       {displayedCategories.map((item, idx) => (
         <span
           key={idx}
@@ -44,14 +47,14 @@ const CategoryBadges: React.FC<CategoryBadgesProps> = ({
             backgroundColor: item.category.bgColor,
             color: item.category.color,
           }}
-          className={`inline-flex items-center gap-1 rounded-full font-semibold whitespace-nowrap ${sizeClasses[size]}`}
+          className={`inline-flex items-center font-semibold whitespace-nowrap ${sizeClasses[size]}`}
         >
-          {item.category.emoji} {item.category.name}
+          {item.category.name}
         </span>
       ))}
       {moreCount > 0 && (
         <span
-          className={`inline-flex items-center rounded-full bg-gray-100 text-gray-600 font-semibold whitespace-nowrap ${sizeClasses[size]}`}
+          className={`inline-flex items-center bg-gray-100 text-gray-600 font-semibold whitespace-nowrap ${sizeClasses[size]}`}
         >
           +{moreCount} more
         </span>

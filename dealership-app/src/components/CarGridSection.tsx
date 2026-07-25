@@ -2,7 +2,6 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { generateCarUrl } from '../lib/seoRoutes';
 import { getCloudinaryThumbnail, getPrimaryImage, handleImageError } from '../lib/imageHelper';
-import CategoryBadges from './CategoryBadges';
 import { MapPin, ChevronRight } from 'lucide-react';
 
 interface Car {
@@ -20,7 +19,6 @@ interface Car {
   images: { url: string; isPrimary: boolean }[];
   maker?: { name: string };
   model?: { name: string };
-  categories?: Array<{ category: { name: string; emoji: string; color: string; bgColor: string } }>;
 }
 
 interface CarGridSectionProps {
@@ -28,7 +26,21 @@ interface CarGridSectionProps {
   cars: Car[];
   seeMoreLink?: string;
   showRank?: boolean;
+  /** Cap the section at N FULL rows at every breakpoint. The grid ladder is
+      2/3/4/5 columns (base/sm/md/xl), so a plain slice can't do this — 10
+      cards is 2 rows at xl but 5 rows on a phone. Per-index responsive
+      visibility hides the overflow instead. Undefined = render everything
+      (the /cars grid mode). */
+  maxRows?: number;
 }
+
+// Literal class strings — Tailwind's compiler only keeps classes it can see.
+const capClass = (index: number, maxRows: number): string => {
+  if (index < 2 * maxRows) return '';
+  if (index < 3 * maxRows) return 'hidden sm:block';
+  if (index < 4 * maxRows) return 'hidden md:block';
+  return 'hidden xl:block';
+};
 
 // Non-breaking space: "MK" must never wrap onto its own line above the amount
 // on narrow screens.
@@ -39,9 +51,14 @@ const CarGridSection: React.FC<CarGridSectionProps> = ({
   cars,
   seeMoreLink = '/cars',
   showRank = false,
+  maxRows,
 }) => {
   const navigate = useNavigate();
   if (!cars.length) return null;
+
+  // Widest ladder is 5 columns, so maxRows*5 covers every breakpoint;
+  // capClass hides the per-breakpoint overflow.
+  const visibleCars = maxRows ? cars.slice(0, maxRows * 5) : cars;
 
   return (
     <section className="mb-8 sm:mb-10 animate-fade-up">
@@ -69,14 +86,14 @@ const CarGridSection: React.FC<CarGridSectionProps> = ({
           one giant card per row and endless scrolling. Titles truncate and
           the price row wraps, so two-up stays clean even at ~165px cards. */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-x-3 sm:gap-x-4 gap-y-5 sm:gap-y-6 stagger-children">
-        {cars.map((car, index) => {
+        {visibleCars.map((car, index) => {
           const primary = getPrimaryImage(car.images);
 
           return (
             <Link
               to={generateCarUrl(car)}
               key={car.id}
-              className="car-item no-underline text-inherit group"
+              className={`car-item no-underline text-inherit group ${maxRows ? capClass(index, maxRows) : ''}`}
             >
               {/* Image */}
               <div className="car-item-image">
@@ -124,18 +141,12 @@ const CarGridSection: React.FC<CarGridSectionProps> = ({
                   )}
                 </div>
 
-                {/* Location */}
+                {/* Location — the card ends here. Category pills are gone:
+                    BE Forward discipline (photo, title, price, facts). */}
                 {car.district && (
                   <div className="flex items-center gap-1.5 text-[11px] text-text-secondary">
                     <MapPin size={12} className="text-text-tertiary" />
                     <span>{car.district}</span>
-                  </div>
-                )}
-
-                {/* Categories */}
-                {car.categories && car.categories.length > 0 && (
-                  <div className="mt-1.5 pt-1.5 border-t border-border">
-                    <CategoryBadges categories={car.categories} max={2} size="sm" />
                   </div>
                 )}
               </div>

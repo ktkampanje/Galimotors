@@ -603,7 +603,7 @@ export const BrowseByCategory: React.FC = () => {
               className={`sidebar-link ${isActive ? 'text-gold-dark font-bold bg-gold-light/60' : ''}`}
             >
               <span className="flex items-center gap-2.5">
-                <span>{c.emoji} {c.name}</span>
+                <span>{c.name}</span>
                 {c.carCount !== undefined && (
                   <span className="text-[11px] text-text-tertiary">({c.carCount.toLocaleString()})</span>
                 )}
