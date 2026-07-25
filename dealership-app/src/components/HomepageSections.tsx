@@ -14,7 +14,7 @@ export const WhatsAppFloat: React.FC = () => {
     // 2. Wait 10s -> Disappears
     // 3. Wait 60s -> Appears
     // 4. Wait 10s -> Disappears
-    let t2: NodeJS.Timeout, t3: NodeJS.Timeout, t4: NodeJS.Timeout;
+    let t2: ReturnType<typeof setTimeout>, t3: ReturnType<typeof setTimeout>, t4: ReturnType<typeof setTimeout>;
 
     const t1 = setTimeout(() => {
       setVisible(true);

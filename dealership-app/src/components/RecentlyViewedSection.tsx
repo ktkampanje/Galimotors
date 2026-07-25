@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Clock, X, Trash2, MapPin } from 'lucide-react';
+import { X, Trash2, MapPin } from 'lucide-react';
 import recentlyViewedService from '../lib/recentlyViewedService';
 import { useCustomerAuth } from '../lib/CustomerAuthContext';
 import { generateCarUrl } from '../lib/seoRoutes';
@@ -9,7 +9,7 @@ import { useModal } from '../components/ui/ModalContext';
 
 interface Car {
   id: string; title: string; basePrice: number; year: number;
-  mileage?: number; transmission?: string; images: { url: string; isPrimary: boolean }[];
+  mileage?: number; transmission?: string; district?: string; images: { url: string; isPrimary: boolean }[];
   maker?: { name: string }; model?: { name: string };
   makerSlug?: string; modelSlug?: string; uuidShort?: string;
 }
@@ -56,7 +56,7 @@ export const RecentlyViewedSection: React.FC = () => {
 
   const handleRemoveCar = async (carId: string) => {
     try {
-      await recentlyViewedService.removeRecentlyViewed(carId);
+      await recentlyViewedService.removeCar(carId);
       setCars(cars.filter(car => car.id !== carId));
     } catch (e) { /* ignore */ }
   };

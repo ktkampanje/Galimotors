@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Check, X, Phone, MessageSquare, Car, Calendar, Send, ChevronDown, ArrowLeft, User, Store } from 'lucide-react';
+import { Check, X, Phone, MessageSquare, Car, Calendar, Send, ArrowLeft, User, Store } from 'lucide-react';
 import { api } from '../lib/api';
 import { getCloudinaryThumbnail, getPrimaryImage, handleImageError } from '../lib/imageHelper';
 import { useSettings } from '../hooks/useSettings';

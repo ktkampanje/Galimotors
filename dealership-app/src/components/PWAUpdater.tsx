@@ -7,7 +7,7 @@ const PWAUpdater: React.FC = () => {
     needRefresh: [needRefresh, setNeedRefresh],
     updateServiceWorker,
   } = useRegisterSW({
-    onRegisterError(error) {
+    onRegisterError(error: unknown) {
       console.error('SW registration error', error);
     },
   });

@@ -106,7 +106,9 @@ class PWAService {
     if ('serviceWorker' in navigator && 'sync' in window.ServiceWorkerRegistration.prototype) {
       try {
         const registration = await navigator.serviceWorker.ready;
-        await registration.sync.register(tag);
+        // Background Sync is not in TypeScript's DOM lib yet; the feature
+        // check above guards real availability.
+        await (registration as ServiceWorkerRegistration & { sync: { register(tag: string): Promise<void> } }).sync.register(tag);
       } catch (error) {
         console.error('Background sync failed:', error);
       }
@@ -182,7 +184,7 @@ class PWAService {
     (window as any).installApp = async () => {
       if (deferredPrompt) {
         deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
+        await deferredPrompt.userChoice;
         deferredPrompt = null;
         this.hideInstallButton();
       }

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Heart, Trash2, ArrowLeft, MapPin } from 'lucide-react';
-import customerAuthService from '../lib/customerAuthService';
 import favoritesService from '../lib/favoritesService';
 import { generateCarUrl } from '../lib/seoRoutes';
 import { getCloudinaryThumbnail, getPrimaryImage, handleImageError } from '../lib/imageHelper';
@@ -22,11 +21,10 @@ interface FavoriteCar {
 }
 
 const fmt = (n: number) => 'MK ' + n.toLocaleString();
-const trans = (t?: string) => t === 'AUTOMATIC' ? 'Auto' : t === 'MANUAL' ? 'Manual' : t;
 
 const FavoritesPage: React.FC = () => {
   const { showConfirm } = useModal();
-  const { toggleFavorite, clearFavorites, refreshActivity } = useUserActivity();
+  const { toggleFavorite, clearFavorites } = useUserActivity();
   const [favorites, setFavorites] = useState<FavoriteCar[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
@@ -137,7 +135,6 @@ const FavoritesPage: React.FC = () => {
               const car = favorite.car;
               const primaryImage = getPrimaryImage(car.images);
               const locationName = car.district || car.locationCity;
-              const tLabel = trans(car.transmission);
 
               return (
                 <div key={favorite.favoriteId} className="car-item relative group block">

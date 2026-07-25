@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { generateCarUrl } from '../lib/seoRoutes';
 import { getCloudinaryThumbnail, getPrimaryImage, handleImageError } from '../lib/imageHelper';
 import CategoryBadges from './CategoryBadges';
-import { MapPin, Zap, ChevronRight } from 'lucide-react';
+import { MapPin, ChevronRight } from 'lucide-react';
 
 interface Car {
   id: string;
@@ -71,7 +71,6 @@ const CarGridSection: React.FC<CarGridSectionProps> = ({
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-x-3 sm:gap-x-4 gap-y-5 sm:gap-y-6 stagger-children">
         {cars.map((car, index) => {
           const primary = getPrimaryImage(car.images);
-          const transLabel = car.transmission === 'AUTOMATIC' ? 'Auto' : car.transmission === 'MANUAL' ? 'Manual' : car.transmission;
 
           return (
             <Link

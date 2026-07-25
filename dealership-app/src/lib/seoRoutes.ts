@@ -28,7 +28,7 @@ export const generateCarUrl = (car: CarUrlData): string => {
 };
 
 // Parse SEO URL to extract car ID
-export const parseCarUrl = (makerSlug: string, modelSlug: string, uuidShort: string): string => {
+export const parseCarUrl = (_makerSlug: string, _modelSlug: string, uuidShort: string): string => {
   // In a real implementation, you'd query the database to find the full UUID
   // For now, we'll assume the uuidShort is enough to identify the car
   return uuidShort;

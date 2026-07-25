@@ -460,7 +460,7 @@ const CarDetailSEO: React.FC = () => {
                       <form onSubmit={submitInquiry} className="space-y-3 bg-muted/30 p-4 border border-border">
                         {/* Light nudge, not a gate — signing in prefills and
                             keeps the quote conversation on their account. */}
-                        {!isAuthenticated && formStatus !== 'sent' && (
+                        {!isAuthenticated && (
                           <p className="text-[11.5px] text-text-secondary">
                             Have an account?{' '}
                             <button
