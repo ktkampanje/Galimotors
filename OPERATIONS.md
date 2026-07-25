@@ -132,10 +132,18 @@ but know them:
 
 ## Admin accounts & password recovery
 
+**In production the environment IS the super admin.** With
+`SUPER_ADMIN_EMAIL` + `SUPER_ADMIN_PASSWORD` set (they are permanent
+variables, not one-time bootstrap), every boot enforces: that account
+exists, holds the ONLY `SUPER_ADMIN` role (others are demoted to
+`SUB_ADMIN`), and has exactly that password. To change the live admin
+password: change the variable in Vercel and redeploy. Locked out? The
+variables ARE the recovery — set them and redeploy.
+
 There is no self-service "forgot password" (it needs email, which isn't
-wired). A SUPER_ADMIN can already reset any teammate's password in the
-Users screen. For the locked-out-sole-admin case, use the CLI instead of
-editing the database by hand:
+wired). A SUPER_ADMIN can reset any teammate's password in the Users
+screen. Locally (variables unset), use the CLI instead of editing the
+database by hand:
 
 ```
 npm run admin -- list                              # who exists, flags seed/test logins
