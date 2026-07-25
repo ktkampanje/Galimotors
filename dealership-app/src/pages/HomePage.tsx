@@ -10,7 +10,7 @@ import FeaturedCarousel from '../components/FeaturedCarousel';
 import CarGridSection from '../components/CarGridSection';
 import { RecentlyViewedSection } from '../components/RecentlyViewedSection';
 import { WhatsAppFloat } from '../components/HomepageSections';
-import { Loader2, SlidersHorizontal, X, MessageCircle, Phone, Mail, MapPin, Search } from 'lucide-react';
+import { Loader2, SlidersHorizontal, X, MessageCircle, Phone, Mail, MapPin, Search, ChevronRight } from 'lucide-react';
 import { API_BASE_URL } from '../lib/api';
 import { useSettings } from '../hooks/useSettings';
 import { getCloudinaryThumbnail, getPrimaryImage } from '../lib/imageHelper';
@@ -26,7 +26,7 @@ interface Car {
 }
 
 const SkeletonGrid: React.FC = () => (
-  <div className="grid grid-cols-1 min-[400px]:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-x-4 gap-y-6 stagger-children">
+  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-x-4 gap-y-6 stagger-children">
     {Array.from({ length: 8 }).map((_, i) => (
       <div key={i}>
         <div className="aspect-[4/3] bg-muted skeleton mb-3" />
@@ -360,6 +360,16 @@ const HomePage: React.FC = () => {
                   {c.label}
                 </Link>
               ))}
+              {/* The full-catalog entry, at the very top where mobile users
+                  actually see it — the old sole entry sat below every
+                  section, several screens down. Gold: it is THE call to
+                  action of the homepage. */}
+              <Link
+                to="/cars"
+                className="px-3.5 py-1.5 bg-gold text-dark text-[12.5px] font-bold hover:bg-white transition-colors no-underline inline-flex items-center gap-1"
+              >
+                Browse all cars <ChevronRight size={13} />
+              </Link>
             </div>
           </div>
         </div>

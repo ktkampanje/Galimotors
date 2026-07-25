@@ -384,7 +384,9 @@ const TileStrip: React.FC<{
   items: StripItem[];
   /** 'district' renders dark navy location tiles with a gold pin. */
   variant?: 'brand' | 'district';
-}> = ({ title, items, variant = 'brand' }) => {
+  /** Every homepage section carries the same See-all affordance. */
+  seeAllHref?: string;
+}> = ({ title, items, variant = 'brand', seeAllHref }) => {
   const railRef = React.useRef<HTMLDivElement>(null);
   const [overflows, setOverflows] = useState(false);
 
@@ -416,24 +418,34 @@ const TileStrip: React.FC<{
           <span className="w-1 h-5 bg-gold shrink-0" aria-hidden="true" />
           <h2 className="text-[17px] sm:text-[19px] font-extrabold text-dark tracking-tight truncate">{title}</h2>
         </div>
-        {overflows && (
-          <div className="flex items-center gap-1 shrink-0">
-            <button
-              onClick={() => scroll(-1)}
-              aria-label={`Scroll ${title} left`}
-              className="w-8 h-8 flex items-center justify-center border border-border bg-white text-text-secondary hover:text-dark hover:border-gold-dark transition-colors"
+        <div className="flex items-center gap-2 shrink-0">
+          {overflows && (
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => scroll(-1)}
+                aria-label={`Scroll ${title} left`}
+                className="w-8 h-8 flex items-center justify-center border border-border bg-white text-text-secondary hover:text-dark hover:border-gold-dark transition-colors"
+              >
+                <ChevronRight size={16} className="rotate-180" />
+              </button>
+              <button
+                onClick={() => scroll(1)}
+                aria-label={`Scroll ${title} right`}
+                className="w-8 h-8 flex items-center justify-center border border-border bg-white text-text-secondary hover:text-dark hover:border-gold-dark transition-colors"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          )}
+          {seeAllHref && (
+            <Link
+              to={seeAllHref}
+              className="inline-flex items-center gap-1 border border-border bg-white px-3.5 py-1.5 text-[12.5px] font-semibold text-dark hover:border-gold-dark hover:text-gold-dark transition-colors no-underline"
             >
-              <ChevronRight size={16} className="rotate-180" />
-            </button>
-            <button
-              onClick={() => scroll(1)}
-              aria-label={`Scroll ${title} right`}
-              className="w-8 h-8 flex items-center justify-center border border-border bg-white text-text-secondary hover:text-dark hover:border-gold-dark transition-colors"
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
-        )}
+              See all <ChevronRight size={14} />
+            </Link>
+          )}
+        </div>
       </div>
       <div ref={railRef} className="overflow-x-auto pb-2 scrollbar-hide">
         <div className="flex gap-3 w-max">
@@ -498,6 +510,7 @@ export const MakeStrip: React.FC = () => {
   return (
     <TileStrip
       title="Browse by Make"
+      seeAllHref="/cars"
       items={makers.map(m => ({
         id: m.id,
         name: m.name,
@@ -521,6 +534,7 @@ export const BodyTypeStrip: React.FC = () => {
   return (
     <TileStrip
       title="Browse by Body Type"
+      seeAllHref="/cars"
       items={types.map(t => ({
         id: t.id,
         name: t.name,
@@ -548,6 +562,7 @@ export const DistrictStrip: React.FC = () => {
     <TileStrip
       title="Browse by District"
       variant="district"
+      seeAllHref="/cars"
       items={list.map(d => ({
         id: d.id,
         name: d.name,

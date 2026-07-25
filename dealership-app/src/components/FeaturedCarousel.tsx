@@ -51,7 +51,7 @@ const FeaturedCarousel: React.FC<Props> = ({ cars: propCars }) => {
       </div>
       <div className="flex gap-5 overflow-hidden">
         {[1,2,3,4].map(i=>(
-          <div key={i} className="shrink-0 w-[220px] sm:w-[260px]">
+          <div key={i} className="shrink-0 w-[46vw] max-w-[220px] sm:w-[260px] sm:max-w-none">
             <div className="aspect-[16/10] bg-muted rounded-xl skeleton mb-3"/>
             <div className="h-3.5 bg-muted rounded skeleton mb-2 w-3/4"/>
             <div className="h-3.5 bg-muted rounded skeleton mb-2 w-1/2"/>
@@ -101,7 +101,7 @@ const FeaturedCarousel: React.FC<Props> = ({ cars: propCars }) => {
             <Link
               key={car.id}
               to={generateCarUrl(car)}
-              className="shrink-0 w-[220px] sm:w-[260px] car-item no-underline text-inherit snap-start group"
+              className="shrink-0 w-[46vw] max-w-[220px] sm:w-[260px] sm:max-w-none car-item no-underline text-inherit snap-start group"
             >
               {/* Image */}
               <div className="car-item-image aspect-[16/10]">

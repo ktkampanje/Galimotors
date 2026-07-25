@@ -64,9 +64,11 @@ const CarGridSection: React.FC<CarGridSectionProps> = ({
       </div>
 
       {/* Grid */}
-      {/* One column under 400px: fold cover screens and split view cannot fit
-          two cards without clipping titles and prices. */}
-      <div className="grid grid-cols-1 min-[400px]:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-x-3 sm:gap-x-4 gap-y-5 sm:gap-y-6 stagger-children">
+      {/* Two columns from the smallest phones up: most devices are 360-393px
+          CSS wide, so a ≥400px threshold quietly gave nearly every customer
+          one giant card per row and endless scrolling. Titles truncate and
+          the price row wraps, so two-up stays clean even at ~165px cards. */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-x-3 sm:gap-x-4 gap-y-5 sm:gap-y-6 stagger-children">
         {cars.map((car, index) => {
           const primary = getPrimaryImage(car.images);
           const transLabel = car.transmission === 'AUTOMATIC' ? 'Auto' : car.transmission === 'MANUAL' ? 'Manual' : car.transmission;
@@ -113,8 +115,10 @@ const CarGridSection: React.FC<CarGridSectionProps> = ({
               <div className="mt-2.5 space-y-1">
                 <p className="car-item-title group-hover:text-gold-dark transition-colors duration-200">{car.title}</p>
 
-                {/* Price */}
-                <div className="flex items-baseline gap-2">
+                {/* Price. flex-wrap: on ~165px two-up mobile cards the price
+                    and "Negotiable" cannot share a line — the tag drops
+                    below instead of overflowing the card. */}
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                   <span className="car-item-price">{fmt(car.basePrice)}</span>
                   {car.negotiable && (
                     <span className="text-[11px] text-text-secondary font-medium">Negotiable</span>
