@@ -4,7 +4,7 @@ import {
   LayoutDashboard, CheckSquare, Target, Settings, LogOut,
   Search, Bell, Car, Users, LayoutGrid, Layers, MapPin, Activity, Tag, X,
   ChevronLeft, ChevronDown, Menu, Store, CheckCircle, MessageSquare, Eye, FileText, Image, HandCoins
-} from 'lucide-react';
+, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { api } from '../lib/api';
 /**
@@ -56,6 +56,7 @@ const NAV_SECTIONS = [
       { icon: Target, label: 'Commissions', path: '/commissions', roles: ['SUPER_ADMIN', 'SUB_ADMIN'] },
       { icon: Users, label: 'Users', path: '/users', roles: ['SUPER_ADMIN'] },
       { icon: Activity, label: 'Activity', path: '/activity', roles: ['SUPER_ADMIN'] },
+      { icon: AlertTriangle, label: 'System Errors', path: '/system-errors', roles: ['SUPER_ADMIN', 'SUB_ADMIN'] },
     ],
   },
 ];

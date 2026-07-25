@@ -29,6 +29,7 @@ interface DashboardData {
     pendingPayments: number;
     pendingApprovalCars: number;
     newSellRequests: number;
+    systemErrors: number;
     expiringReservations: { id: string; title: string; reservationExpiry: string }[];
   };
 }
@@ -91,6 +92,12 @@ export default function AnalyticsDashboard() {
 
   // ── Action items: real queues only, each with a real destination ──
   const actions: { label: string; detail: string; urgent: boolean; to: string; icon: React.ReactNode }[] = [];
+  if (queues?.systemErrors) {
+    actions.push({
+      label: `${queues.systemErrors} system error${queues.systemErrors > 1 ? 's' : ''} recorded`,
+      detail: 'Something failed on the server — review it', urgent: true, to: '/system-errors', icon: <ShieldCheck size={15} />,
+    });
+  }
   if (queues?.pendingPayments) {
     actions.push({
       label: `${queues.pendingPayments} payment${queues.pendingPayments > 1 ? 's' : ''} awaiting verification`,

@@ -8,9 +8,12 @@ import { getAdminWhatsApp } from '../lib/businessContact';
  * Runs every 15 minutes to check for expired reservations
  * Updates car status to AVAILABLE and notifies relevant parties
  */
-export const startReservationExpiryJob = () => {
-  // Run every 15 minutes: */15 * * * *
-  cron.schedule('*/15 * * * *', async () => {
+/**
+ * The expiry sweep itself, callable from three places: the local node-cron
+ * schedule, the Vercel daily cron endpoint, and the traffic-driven throttled
+ * sweep in the request path (serverless has no reliable timers).
+ */
+export const runReservationExpiry = async () => {
     const now = new Date();
     console.log(`[${now.toISOString()}] Running reservation expiry check...`);
     
@@ -103,8 +106,11 @@ export const startReservationExpiryJob = () => {
     } catch (error) {
       console.error('Error in reservation expiry job:', error);
     }
-  });
+};
 
+export const startReservationExpiryJob = () => {
+  // Run every 15 minutes: */15 * * * *
+  cron.schedule('*/15 * * * *', runReservationExpiry);
   console.log('✓ Reservation expiry cron job initialized (runs every 15 minutes)');
 };
 

@@ -23,6 +23,7 @@ const CommissionDashboard = lazy(() => import('./pages/CommissionDashboard'));
 const UserManagement = lazy(() => import('./pages/UserManagement'));
 const BulkOperations = lazy(() => import('./pages/BulkOperations'));
 const ActivityLog = lazy(() => import('./pages/ActivityLog'));
+const SystemErrors = lazy(() => import('./pages/SystemErrors'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const ViewingsManager = lazy(() => import('./pages/ViewingsManager'));
 
@@ -99,6 +100,7 @@ function App() {
             <Route path="/users" element={<Suspense fallback={<PageLoader />}><UserManagement /></Suspense>} />
             <Route path="/bulk" element={<Suspense fallback={<PageLoader />}><BulkOperations /></Suspense>} />
             <Route path="/activity" element={<Suspense fallback={<PageLoader />}><ActivityLog /></Suspense>} />
+            <Route path="/system-errors" element={<Suspense fallback={<PageLoader />}><SystemErrors /></Suspense>} />
             <Route path="/locations" element={<Suspense fallback={<PageLoader />}><LocationManager /></Suspense>} />
             <Route path="/settings" element={<Suspense fallback={<PageLoader />}><SettingsPage /></Suspense>} />
           </Route>

@@ -365,6 +365,7 @@ export const getDashboardOverview = async (req: Request, res: Response) => {
       pendingPayments,
       pendingApprovalCars,
       newSellRequests,
+      systemErrors,
       expiringReservations,
       recentInventory,
       recentLeads
@@ -390,6 +391,7 @@ export const getDashboardOverview = async (req: Request, res: Response) => {
       prisma.lead.count({ where: { paymentStatus: 'PENDING_VERIFICATION' } }),
       prisma.car.count({ where: { status: 'PENDING_APPROVAL', deletedAt: null } }),
       prisma.sellRequest.count({ where: { status: 'NEW' } }),
+      prisma.errorLog.count({ where: { resolved: false } }),
       prisma.car.findMany({
         where: {
           status: 'RESERVED',
@@ -443,6 +445,7 @@ export const getDashboardOverview = async (req: Request, res: Response) => {
         pendingPayments,
         pendingApprovalCars,
         newSellRequests,
+        systemErrors,
         expiringReservations
       }
     });

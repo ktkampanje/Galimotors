@@ -34,6 +34,10 @@ import metaFeedRoutes from "./routes/metaFeedRoutes";
 import sellRequestRoutes from "./routes/sellRequestRoutes";
 import staticPageRoutes from "./routes/staticPageRoutes";
 import searchRoutes from "./routes/searchRoutes";
+import cronRoutes from "./routes/cronRoutes";
+import errorRoutes from "./routes/errorRoutes";
+import { logServerError } from "./services/errorLogService";
+import { runReservationExpiry } from "./jobs/reservationExpiryJob";
 import { initCronJobs } from "./jobs/cronJobs";
 import { getFilterStatsFromCache } from "./services/filterStatsCacheService";
 import { applySqlitePragmas } from "./services/backupService";
@@ -106,6 +110,46 @@ app.use("/api/", generalRateLimit);
 // API ROUTES
 // ==========================================
 
+// ── Error capture ──────────────────────────────────────────────────────
+// Every 5xx response is recorded for the admin System Errors screen. The
+// json wrap stashes the response body so controller-caught errors (which
+// respond 500 themselves) still yield a useful message; uncaught route
+// errors are captured with a stack by the final error middleware below.
+app.use((req, res, next) => {
+  const originalJson = res.json.bind(res);
+  (res as any).json = (body: unknown) => {
+    (res as any).__jsonBody = body;
+    return originalJson(body);
+  };
+  res.on("finish", () => {
+    // __errorCaptured: the final error middleware already logged this one
+    // with its full stack — don't record a second, stackless row.
+    if (res.statusCode >= 500 && !(res as any).__errorCaptured && !req.path.startsWith("/api/errors")) {
+      const body = (res as any).__jsonBody as { message?: string; error?: string } | undefined;
+      logServerError("api", new Error(body?.message || body?.error || `HTTP ${res.statusCode}`), {
+        method: req.method,
+        path: req.originalUrl?.slice(0, 300),
+        statusCode: res.statusCode,
+      });
+    }
+  });
+  next();
+});
+
+// ── Reservation expiry, traffic-driven ─────────────────────────────────
+// Serverless has no timers, and the hobby-tier cron fires only daily —
+// too slow for reservations that expire in hours. Any request more than
+// 15 minutes after the last sweep triggers one in the background.
+let lastExpirySweep = 0;
+app.use((_req, _res, next) => {
+  const now = Date.now();
+  if (now - lastExpirySweep > 15 * 60 * 1000) {
+    lastExpirySweep = now;
+    runReservationExpiry().catch((error) => logServerError("cron", error, { path: "expiry-sweep" }));
+  }
+  next();
+});
+
 // Super-admin enforcement runs INSIDE the request path (memoized), not as
 // module-load fire-and-forget: a serverless instance freezes the moment a
 // response is sent, so a promise started at load time can be suspended
@@ -154,6 +198,8 @@ app.use("/api/feeds", metaFeedRoutes);
 app.use("/api/sell-requests", sellRequestRoutes);
 app.use("/api/pages", staticPageRoutes);
 app.use("/api/search", searchRoutes);
+app.use("/api/cron", cronRoutes);
+app.use("/api/errors", errorRoutes);
 
 // SEO Routes (Dynamic Sitemap generation)
 app.use("/", seoRoutes);
@@ -234,6 +280,22 @@ app.get("*", (req, res) => {
   }
 
   res.sendFile(path.join(dealershipDistPath, "index.html"));
+});
+
+// Final error middleware — uncaught route errors land here with their stack,
+// get recorded for the System Errors screen, and the client receives a clean
+// 500 instead of a hung request.
+app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  (res as any).__errorCaptured = true;
+  logServerError("api", err, {
+    method: req.method,
+    path: req.originalUrl?.slice(0, 300),
+    statusCode: 500,
+  });
+  console.error("Unhandled route error:", err);
+  if (!res.headersSent) {
+    res.status(500).json({ message: "Internal server error" });
+  }
 });
 
 // ==========================================

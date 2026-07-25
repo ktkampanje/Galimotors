@@ -377,6 +377,25 @@ model StaticPage {
 }
 
 // ============== FILTER STATISTICS CACHE ============= //
+// Server-side errors surfaced on the admin System Errors screen — the
+// system's own monitoring, because nobody watches hosting logs. Pruned by
+// the daily cron after 30 days.
+model ErrorLog {
+  id         String   @id @default(uuid())
+  level      String   @default("ERROR") // ERROR | WARN
+  source     String   @default("api") // api | server | cron
+  message    String
+  stack      String?
+  method     String?
+  path       String?
+  statusCode Int?
+  meta       String? // JSON string with extra context
+  resolved   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([resolved, createdAt])
+}
+
 model FilterStatsCache {
   id        String   @id @default("STATS_SINGLETON")
   stats     String   // JSON string of all filter statistics

@@ -43,6 +43,13 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  // Cache-buster on GETs: public endpoints are edge-cached for speed
+  // (vercel.json s-maxage), but the admin must always see fresh data —
+  // especially their own edit reflected in the refetch right after saving.
+  // A unique URL per request bypasses every cache layer.
+  if ((config.method || 'get').toLowerCase() === 'get') {
+    config.params = { ...(config.params || {}), _t: Date.now() };
+  }
   return config;
 });
 
