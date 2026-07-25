@@ -14,7 +14,15 @@ export const getSiteUrl = (): string => {
   const explicit = process.env.PUBLIC_SITE_URL || process.env.FRONTEND_URL;
   if (explicit) return explicit.replace(/\/+$/, "");
 
-  // Vercel sets VERCEL_URL to the deployment host, without a scheme.
+  // The PUBLIC production domain (e.g. galimotors.vercel.app). This must be
+  // preferred over VERCEL_URL: that one is the per-deployment internal host,
+  // which Vercel gates behind its own login — a customer who tapped a
+  // WhatsApp quote link built from it was asked to "Log in to Vercel".
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+    return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+  }
+
+  // Last-resort deployment host (scheme-less), better than localhost.
   if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
 
   // Local development: the customer site, not the admin panel.

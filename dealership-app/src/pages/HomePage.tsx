@@ -294,17 +294,14 @@ const HomePage: React.FC = () => {
         <div className="relative overflow-hidden bg-dark border-b border-border">
           {heroImages.length > 0 && (
             <div className="absolute inset-0 pointer-events-none select-none" aria-hidden="true">
-              <div className="flex h-full w-max animate-hero-marquee">
-                {[...heroImages, ...heroImages].map((url, i) => (
-                  <img
-                    key={i}
-                    src={getCloudinaryThumbnail(url, 640)}
-                    alt=""
-                    draggable={false}
-                    className="h-full w-auto object-cover opacity-45"
-                  />
-                ))}
-              </div>
+              {heroImages.length > 0 && (
+                <img
+                  src={getCloudinaryThumbnail(heroImages[0], 1920)}
+                  alt=""
+                  draggable={false}
+                  className="w-full h-full object-cover opacity-45"
+                />
+              )}
               {/* Scrim keeps the headline and search legible over any photo */}
               <div className="absolute inset-0 bg-gradient-to-b from-dark/80 via-dark/65 to-dark/85" />
             </div>
