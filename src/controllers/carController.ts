@@ -1297,10 +1297,12 @@ export const getHomepageCars = async (req: Request, res: Response) => {
 
     const sections = categoryRows
       .map((c) => ({ id: c.id, name: c.name, cars: c.cars.map((cc) => cc.car) }))
-      // Empty categories render nothing; "New Arrival" is covered by the
-      // automatic New Arrivals strip — a second identical row would be the
-      // exact duplication this page was decongested to remove.
-      .filter((s) => s.cars.length > 0 && !/new\s*arrivals?/i.test(s.name));
+      // Empty categories render nothing. Two names are excluded by policy:
+      // "New Arrival" is covered by the automatic New Arrivals strip, and
+      // "Verified" must never be a section — every car on this site is
+      // verified by the brand promise, and a Verified section implies the
+      // cars outside it are not.
+      .filter((s) => s.cars.length > 0 && !/new\s*arrivals?|verified/i.test(s.name));
 
     res.set("Cache-Control", "public, max-age=300"); // Cache for 5 minutes
     res.json({ featured, recent, preview, sections, total, hasMore: total > 8 });
