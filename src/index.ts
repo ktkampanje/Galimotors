@@ -241,58 +241,67 @@ getFilterStatsFromCache()
     console.error('⚠️  Failed to initialize filter cache:', error);
   });
 
-const server = app.listen(PORT, () => {
-  console.log(
-    `🚀 Malawian Brokerage System API running on http://localhost:${PORT}`,
-  );
-  console.log(
-    `🔒 Security features enabled: CSRF, Rate Limiting, Input Sanitization, CSP Headers`,
-  );
-});
-
-// ==========================================
-// GRACEFUL SHUTDOWN & CRASH TOLERANCE
-// ==========================================
-// Deploys restart this process while customers are mid-request. Instead of
-// cutting them off: stop accepting NEW connections, let in-flight requests
-// finish, checkpoint the WAL so dev.db is a complete file on disk, then exit.
-// A process manager (PM2/systemd) brings the new version up — the visible
-// gap is a couple of seconds.
-
-let shuttingDown = false;
-const shutdown = (reason: string, exitCode = 0) => {
-  if (shuttingDown) return;
-  shuttingDown = true;
-  console.log(`\n🛑 ${reason} — draining in-flight requests...`);
-
-  server.close(async () => {
-    try {
-      // Fold the WAL into dev.db so the file alone is a complete database.
-      await prisma.$queryRawUnsafe("PRAGMA wal_checkpoint(TRUNCATE)");
-    } catch {
-      /* pragma is best-effort on shutdown */
-    }
-    await prisma.$disconnect();
-    console.log("✓ Clean shutdown complete");
-    process.exit(exitCode);
+// On Vercel the app is NOT a long-lived server: api/index.js imports this
+// module and hands the Express app to the platform as a serverless function.
+// Listening on a port there would be meaningless (and the process-level
+// shutdown handling belongs to the platform). Everything below only applies
+// when running as a real server (local dev, VPS under PM2).
+if (!process.env.VERCEL) {
+  const server = app.listen(PORT, () => {
+    console.log(
+      `🚀 Malawian Brokerage System API running on http://localhost:${PORT}`,
+    );
+    console.log(
+      `🔒 Security features enabled: CSRF, Rate Limiting, Input Sanitization, CSP Headers`,
+    );
   });
 
-  // Failsafe: a stuck connection must not block the deploy forever.
-  setTimeout(() => process.exit(exitCode), 10_000).unref();
-};
+  // ==========================================
+  // GRACEFUL SHUTDOWN & CRASH TOLERANCE
+  // ==========================================
+  // Deploys restart this process while customers are mid-request. Instead of
+  // cutting them off: stop accepting NEW connections, let in-flight requests
+  // finish, checkpoint the WAL so dev.db is a complete file on disk, then
+  // exit. A process manager (PM2/systemd) brings the new version up — the
+  // visible gap is a couple of seconds.
 
-process.on("SIGTERM", () => shutdown("SIGTERM received"));
-process.on("SIGINT", () => shutdown("SIGINT received"));
+  let shuttingDown = false;
+  const shutdown = (reason: string, exitCode = 0) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.log(`\n🛑 ${reason} — draining in-flight requests...`);
 
-// A single failed promise somewhere must not take down the whole site
-// (Node's default since v15 is to crash the process).
-process.on("unhandledRejection", (reason) => {
-  console.error("⚠️  Unhandled promise rejection (server continues):", reason);
-});
+    server.close(async () => {
+      try {
+        // Fold the WAL into dev.db so the file alone is a complete database.
+        await prisma.$queryRawUnsafe("PRAGMA wal_checkpoint(TRUNCATE)");
+      } catch {
+        /* pragma is best-effort on shutdown */
+      }
+      await prisma.$disconnect();
+      console.log("✓ Clean shutdown complete");
+      process.exit(exitCode);
+    });
 
-// After an uncaught synchronous error the process state is unknown — log,
-// exit nonzero, and let the process manager restart a clean instance.
-process.on("uncaughtException", (error) => {
-  console.error("💥 Uncaught exception — exiting for clean restart:", error);
-  shutdown("Uncaught exception", 1);
-});
+    // Failsafe: a stuck connection must not block the deploy forever.
+    setTimeout(() => process.exit(exitCode), 10_000).unref();
+  };
+
+  process.on("SIGTERM", () => shutdown("SIGTERM received"));
+  process.on("SIGINT", () => shutdown("SIGINT received"));
+
+  // A single failed promise somewhere must not take down the whole site
+  // (Node's default since v15 is to crash the process).
+  process.on("unhandledRejection", (reason) => {
+    console.error("⚠️  Unhandled promise rejection (server continues):", reason);
+  });
+
+  // After an uncaught synchronous error the process state is unknown — log,
+  // exit nonzero, and let the process manager restart a clean instance.
+  process.on("uncaughtException", (error) => {
+    console.error("💥 Uncaught exception — exiting for clean restart:", error);
+    shutdown("Uncaught exception", 1);
+  });
+}
+
+export default app;
