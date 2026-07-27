@@ -206,6 +206,9 @@ const CarDetailSEO: React.FC = () => {
   const [showForm, setShowForm] = useState(false);
   const [whatsappLoading, setWhatsappLoading] = useState(false);
   const [showAllPhotos, setShowAllPhotos] = useState(false);
+  // Full-screen scrollable grid of EVERY photo — what "+N photos" opens.
+  // Tapping any photo there goes fullscreen at that exact photo.
+  const [showGallery, setShowGallery] = useState(false);
 
   // Prefill from the account. Re-runs on auth change so a visitor who signs
   // in via the Get a Quote gate lands in a form already filled in.
@@ -399,6 +402,44 @@ const CarDetailSEO: React.FC = () => {
         <script type="application/ld+json">{JSON.stringify(generateCarJsonLD(car))}</script>
       </Helmet>
 
+      {/* ── All-photos grid ───────────────────────────── */}
+      {showGallery && imgs.length > 0 && (
+        <div className="fixed inset-0 z-[9998] bg-dark/95 flex flex-col">
+          <div className="flex items-center justify-between px-4 py-3 shrink-0">
+            <p className="text-white text-[14px] font-bold">All photos ({imgs.length})</p>
+            <button
+              onClick={() => setShowGallery(false)}
+              aria-label="Close photo gallery"
+              className="w-10 h-10 bg-white/10 hover:bg-white/20 text-white flex items-center justify-center"
+            >
+              <X size={20} />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-3 pb-8">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+              {imgs.map((img, i) => (
+                <button
+                  key={i}
+                  onClick={() => { setImgIndex(i); setShowGallery(false); setLightbox(true); }}
+                  className="relative aspect-[4/3] overflow-hidden group"
+                >
+                  <img
+                    src={getCloudinaryThumbnail(img.url, 480)}
+                    alt={`${car.title} — photo ${i + 1}`}
+                    className="w-full h-full object-cover group-hover:opacity-90 transition-opacity"
+                    loading="lazy"
+                    onError={handleImageError}
+                  />
+                  <span className="absolute bottom-1.5 right-1.5 bg-dark/70 text-white text-[10px] font-semibold px-1.5 py-0.5">
+                    {i + 1}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Lightbox ──────────────────────────────────── */}
       {lightbox && imgs.length > 0 && (
         <div
@@ -510,10 +551,13 @@ const CarDetailSEO: React.FC = () => {
                     <div className="w-10 h-10 border-[3px] border-white/50 border-t-gold rounded-full animate-spin drop-shadow-lg" />
                   </div>
                 )}
-                <div className="absolute bottom-4 right-4 bg-dark/70 backdrop-blur-md text-white text-[12px] font-medium px-3 py-1.5 flex items-center gap-1.5">
+                <button
+                  onClick={e => { e.stopPropagation(); setShowGallery(true); }}
+                  className="absolute bottom-4 right-4 bg-dark/70 backdrop-blur-md text-white text-[12px] font-medium px-3 py-1.5 flex items-center gap-1.5"
+                >
                   {imgIndex + 1} / {imgs.length}
-                  {imgs.length > 1 && <ChevronRight size={12} className="lg:hidden opacity-70" />}
-                </div>
+                  {imgs.length > 1 && <span className="hidden min-[380px]:inline opacity-80">· See all</span>}
+                </button>
               </div>
 
               {/* Thumbnails. On phones this is a single horizontal strip —
@@ -532,7 +576,7 @@ const CarDetailSEO: React.FC = () => {
                       return (
                         <button
                           key={i}
-                          onClick={() => { setImgIndex(i); if (moreTile) setLightbox(true); }}
+                          onClick={() => { if (moreTile) { setShowGallery(true); } else { setImgIndex(i); } }}
                           className={`relative aspect-[4/3] overflow-hidden border-2 transition-all ${i === imgIndex && !moreTile ? 'border-coral' : 'border-transparent'}`}
                         >
                           <img src={getCloudinaryThumbnail(img.url, 200)} alt="" className="w-full h-full object-cover" loading="lazy" onError={handleImageError} />
