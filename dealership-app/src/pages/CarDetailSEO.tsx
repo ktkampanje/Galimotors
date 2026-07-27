@@ -170,11 +170,36 @@ const CarDetailSEO: React.FC = () => {
     }
   }, [next, prev]);
 
-  // Keep the active thumbnail in view as the customer swipes, so the strip
-  // visibly scrolls along — that motion is itself the "there are more" cue.
+  // Keep the active thumbnail visible in the desktop grid.
   useEffect(() => {
-    activeThumbRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    activeThumbRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
   }, [imgIndex]);
+
+  // ── Photo-switch feedback ──
+  // Swapping <img src> keeps showing the OLD photo until the new one has
+  // downloaded — on a slow connection the counter moved but the picture
+  // didn't, and customers read that as "broken". Track the in-flight load;
+  // the spinner arms only after 150ms so cached switches stay flicker-free.
+  const [imgLoading, setImgLoading] = useState(false);
+  const [spinnerArmed, setSpinnerArmed] = useState(false);
+  useEffect(() => {
+    setImgLoading(true);
+    setSpinnerArmed(false);
+    const t = setTimeout(() => setSpinnerArmed(true), 150);
+    return () => clearTimeout(t);
+  }, [imgIndex]);
+  const handleMainImageLoaded = useCallback(() => setImgLoading(false), []);
+
+  // Preload the neighbours so most swipes are instant even on slow data.
+  useEffect(() => {
+    const list = car?.images || [];
+    if (list.length < 2) return;
+    [1, -1, 2].forEach(off => {
+      const idx = (imgIndex + off + list.length) % list.length;
+      const pre = new window.Image();
+      pre.src = getCloudinaryFull(list[idx]?.url);
+    });
+  }, [imgIndex, car]);
 
   useEffect(() => {
     if (!lightbox) return;
@@ -269,10 +294,16 @@ const CarDetailSEO: React.FC = () => {
           <img
             src={getCloudinaryFull(imgs[imgIndex]?.url)}
             alt={car.title}
-            className="max-h-[85vh] max-w-[90vw] object-contain"
-            onError={handleImageError}
+            className={`max-h-[85vh] max-w-[90vw] object-contain transition-opacity duration-200 ${imgLoading && spinnerArmed ? 'opacity-40' : ''}`}
+            onLoad={handleMainImageLoaded}
+            onError={e => { setImgLoading(false); handleImageError(e); }}
             onClick={e => e.stopPropagation()}
           />
+          {imgLoading && spinnerArmed && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="w-10 h-10 border-[3px] border-white/40 border-t-gold rounded-full animate-spin" />
+            </div>
+          )}
           <button onClick={e => { e.stopPropagation(); next(); }} className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/10 hover:bg-white/20 text-white flex items-center justify-center  transition-colors">
             <ChevronRight size={24} />
           </button>
@@ -327,8 +358,9 @@ const CarDetailSEO: React.FC = () => {
                   <img
                     src={getCloudinaryFull(imgs[imgIndex]?.url)}
                     alt={`${car.title} — ${imgIndex + 1}`}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
-                    onError={handleImageError}
+                    className={`w-full h-full object-cover transition-all duration-300 group-hover:scale-[1.02] ${imgLoading && spinnerArmed ? 'opacity-50' : ''}`}
+                    onLoad={handleMainImageLoaded}
+                    onError={e => { setImgLoading(false); handleImageError(e); }}
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-text-tertiary text-sm">No image available</div>
@@ -349,6 +381,12 @@ const CarDetailSEO: React.FC = () => {
                     </button>
                   </>
                 )}
+                {/* Loading feedback while the next photo downloads */}
+                {imgLoading && spinnerArmed && (
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="w-10 h-10 border-[3px] border-white/50 border-t-gold rounded-full animate-spin drop-shadow-lg" />
+                  </div>
+                )}
                 <div className="absolute bottom-4 right-4 bg-dark/70 backdrop-blur-md text-white text-[12px] font-medium px-3 py-1.5 flex items-center gap-1.5">
                   {imgIndex + 1} / {imgs.length}
                   {imgs.length > 1 && <ChevronRight size={12} className="lg:hidden opacity-70" />}
@@ -359,28 +397,52 @@ const CarDetailSEO: React.FC = () => {
                   the old 4-column grid stacked ~4 rows of thumbs and pushed
                   the price and CTAs two screens down. Grid from sm: up. */}
               {imgs.length > 1 && (
-                <div className="relative">
-                  <div className="flex overflow-x-auto scrollbar-hide sm:grid sm:grid-cols-6 lg:grid-cols-8 gap-2 mt-3 pb-1 sm:pb-0">
+                <>
+                  {/* Phones: a FIXED row of 4 tiles — no ambiguous scrolling.
+                      The 4th tile carries "+N photos" and opens the
+                      fullscreen viewer where every photo swipes. The old
+                      scroll strip showed 4-5 thumbs and customers concluded
+                      that was the whole gallery. */}
+                  <div className="grid grid-cols-4 gap-2 mt-3 sm:hidden">
+                    {imgs.slice(0, 4).map((img, i) => {
+                      const moreTile = i === 3 && imgs.length > 4;
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => { setImgIndex(i); if (moreTile) setLightbox(true); }}
+                          className={`relative aspect-[4/3] overflow-hidden border-2 transition-all ${i === imgIndex && !moreTile ? 'border-coral' : 'border-transparent'}`}
+                        >
+                          <img src={getCloudinaryThumbnail(img.url, 200)} alt="" className="w-full h-full object-cover" loading="lazy" onError={handleImageError} />
+                          {moreTile && (
+                            <span className="absolute inset-0 bg-dark/70 flex flex-col items-center justify-center text-white">
+                              <span className="text-[16px] font-extrabold leading-none">+{imgs.length - 4}</span>
+                              <span className="text-[9px] font-semibold mt-1 uppercase tracking-wider">photos</span>
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* sm and up: the full grid, unchanged behavior. */}
+                  <div className="hidden sm:grid sm:grid-cols-6 lg:grid-cols-8 gap-2 mt-3">
                     {imgs.slice(0, showAllPhotos ? imgs.length : 15).map((img, i) => (
                       <button
                         key={i}
                         ref={i === imgIndex ? activeThumbRef : undefined}
                         onClick={() => setImgIndex(i)}
-                        className={`w-20 shrink-0 sm:w-auto sm:shrink aspect-[4/3] overflow-hidden border-2 transition-all ${i === imgIndex ? 'border-coral' : 'border-transparent opacity-60 hover:opacity-100'}`}
+                        className={`aspect-[4/3] overflow-hidden border-2 transition-all ${i === imgIndex ? 'border-coral' : 'border-transparent opacity-60 hover:opacity-100'}`}
                       >
                         <img src={getCloudinaryThumbnail(img.url, 200)} alt="" className="w-full h-full object-cover" loading="lazy" onError={handleImageError} />
                       </button>
                     ))}
                     {!showAllPhotos && imgs.length > 15 && (
-                      <button onClick={() => setShowAllPhotos(true)} className="w-20 shrink-0 sm:w-auto sm:shrink aspect-[4/3] bg-muted flex items-center justify-center text-[12px] font-semibold text-text-secondary hover:text-gold-dark transition-colors border-2 border-transparent hover:border-coral">
+                      <button onClick={() => setShowAllPhotos(true)} className="aspect-[4/3] bg-muted flex items-center justify-center text-[12px] font-semibold text-text-secondary hover:text-gold-dark transition-colors border-2 border-transparent hover:border-coral">
                         +{imgs.length - 15} More
                       </button>
                     )}
                   </div>
-                  {/* Right-edge fade on the phone strip — the visual cue that
-                      the thumbnails continue past the screen edge. */}
-                  <div className="sm:hidden pointer-events-none absolute right-0 top-3 bottom-1 w-12 bg-gradient-to-l from-white to-transparent" />
-                </div>
+                </>
               )}
             </div>
 
