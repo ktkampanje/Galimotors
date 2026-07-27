@@ -61,6 +61,128 @@ interface SimilarCarsResponse {
 const fmt = (n: number) => `MK ${n.toLocaleString()}`;
 const transLabel = (t: string) => t === 'AUTOMATIC' ? 'Automatic' : t === 'MANUAL' ? 'Manual' : t;
 
+/**
+ * Fullscreen photo with zoom — pinch / double-tap on touch, wheel /
+ * double-click on desktop, drag-to-pan while zoomed. Zoom resets when the
+ * photo changes. While zoomed, touch events are contained so the parent's
+ * swipe-to-navigate and tap-to-close don't fire mid-inspection.
+ */
+const ZoomableImage: React.FC<{
+  src: string;
+  alt: string;
+  dimmed: boolean;
+  onLoaded: () => void;
+  onFailed: (e: React.SyntheticEvent<HTMLImageElement>) => void;
+}> = ({ src, alt, dimmed, onLoaded, onFailed }) => {
+  const [scale, setScale] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const boxRef = useRef<HTMLDivElement>(null);
+  const gesture = useRef<{ mode: 'none' | 'pan' | 'pinch'; lastX: number; lastY: number; startDist: number; startScale: number; lastTap: number }>({
+    mode: 'none', lastX: 0, lastY: 0, startDist: 0, startScale: 1, lastTap: 0,
+  });
+
+  useEffect(() => { setScale(1); setPan({ x: 0, y: 0 }); }, [src]);
+
+  const clampPan = (x: number, y: number, sc: number) => {
+    const box = boxRef.current?.getBoundingClientRect();
+    const maxX = box ? (box.width * (sc - 1)) / 2 : 0;
+    const maxY = box ? (box.height * (sc - 1)) / 2 : 0;
+    return { x: Math.max(-maxX, Math.min(maxX, x)), y: Math.max(-maxY, Math.min(maxY, y)) };
+  };
+
+  const zoomTo = (next: number, cx?: number, cy?: number) => {
+    const sc = Math.max(1, Math.min(4, next));
+    if (sc === 1) { setScale(1); setPan({ x: 0, y: 0 }); return; }
+    const box = boxRef.current?.getBoundingClientRect();
+    if (box && cx !== undefined && cy !== undefined) {
+      // Keep the tapped point roughly under the finger/cursor.
+      const relX = cx - (box.left + box.width / 2);
+      const relY = cy - (box.top + box.height / 2);
+      setPan(clampPan(-relX * (sc - 1), -relY * (sc - 1), sc));
+    } else {
+      setPan(prev => clampPan(prev.x, prev.y, sc));
+    }
+    setScale(sc);
+  };
+
+  const dist = (t: React.TouchList) =>
+    Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      gesture.current.mode = 'pinch';
+      gesture.current.startDist = dist(e.touches);
+      gesture.current.startScale = scale;
+      e.stopPropagation();
+    } else if (e.touches.length === 1) {
+      gesture.current.lastX = e.touches[0].clientX;
+      gesture.current.lastY = e.touches[0].clientY;
+      gesture.current.mode = scale > 1 ? 'pan' : 'none';
+      if (scale > 1) e.stopPropagation();
+    }
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2 && gesture.current.mode === 'pinch') {
+      zoomTo(gesture.current.startScale * (dist(e.touches) / gesture.current.startDist));
+      e.stopPropagation();
+    } else if (gesture.current.mode === 'pan' && e.touches.length === 1) {
+      const dx = e.touches[0].clientX - gesture.current.lastX;
+      const dy = e.touches[0].clientY - gesture.current.lastY;
+      gesture.current.lastX = e.touches[0].clientX;
+      gesture.current.lastY = e.touches[0].clientY;
+      setPan(prev => clampPan(prev.x + dx, prev.y + dy, scale));
+      e.stopPropagation();
+    }
+  };
+
+  const onTouchEnd = (e: React.TouchEvent) => {
+    if (gesture.current.mode === 'pinch' || scale > 1) e.stopPropagation();
+    if (gesture.current.mode !== 'pinch' && e.changedTouches.length === 1) {
+      const now = Date.now();
+      if (now - gesture.current.lastTap < 300) {
+        // Double-tap: toggle zoom at the tapped point.
+        const t = e.changedTouches[0];
+        zoomTo(scale > 1 ? 1 : 2.5, t.clientX, t.clientY);
+        e.stopPropagation();
+      }
+      gesture.current.lastTap = now;
+    }
+    if (e.touches.length === 0) gesture.current.mode = 'none';
+  };
+
+  const onWheel = (e: React.WheelEvent) => {
+    zoomTo(scale + (e.deltaY < 0 ? 0.35 : -0.35), e.clientX, e.clientY);
+  };
+
+  return (
+    <div
+      ref={boxRef}
+      className="max-h-[85vh] max-w-[92vw] overflow-hidden touch-none"
+      onClick={e => e.stopPropagation()}
+      onDoubleClick={e => { zoomTo(scale > 1 ? 1 : 2.5, e.clientX, e.clientY); }}
+      onWheel={onWheel}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+    >
+      <img
+        src={src}
+        alt={alt}
+        draggable={false}
+        className={`max-h-[85vh] max-w-[92vw] object-contain select-none transition-opacity duration-200 ${dimmed ? 'opacity-40' : ''}`}
+        style={{
+          transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
+          transition: gesture.current.mode === 'none' ? 'transform 0.15s ease-out' : 'none',
+          cursor: scale > 1 ? 'grab' : 'zoom-in',
+        }}
+        onLoad={onLoaded}
+        onError={onFailed}
+      />
+    </div>
+  );
+};
+
 const CarDetailSEO: React.FC = () => {
   const { makerSlug, modelSlug, uuidShort } = useParams<{ makerSlug: string; modelSlug: string; uuidShort: string }>();
   const navigate = useNavigate();
@@ -291,13 +413,12 @@ const CarDetailSEO: React.FC = () => {
           <button onClick={e => { e.stopPropagation(); prev(); }} className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/10 hover:bg-white/20 text-white flex items-center justify-center  transition-colors">
             <ChevronLeft size={24} />
           </button>
-          <img
+          <ZoomableImage
             src={getCloudinaryFull(imgs[imgIndex]?.url)}
             alt={car.title}
-            className={`max-h-[85vh] max-w-[90vw] object-contain transition-opacity duration-200 ${imgLoading && spinnerArmed ? 'opacity-40' : ''}`}
-            onLoad={handleMainImageLoaded}
-            onError={e => { setImgLoading(false); handleImageError(e); }}
-            onClick={e => e.stopPropagation()}
+            dimmed={imgLoading && spinnerArmed}
+            onLoaded={handleMainImageLoaded}
+            onFailed={e => { setImgLoading(false); handleImageError(e); }}
           />
           {imgLoading && spinnerArmed && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -307,7 +428,9 @@ const CarDetailSEO: React.FC = () => {
           <button onClick={e => { e.stopPropagation(); next(); }} className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/10 hover:bg-white/20 text-white flex items-center justify-center  transition-colors">
             <ChevronRight size={24} />
           </button>
-          <p className="absolute bottom-5 left-1/2 -translate-x-1/2 text-white/50 text-[12px]">{imgIndex + 1} / {imgs.length}</p>
+          <p className="absolute bottom-5 left-1/2 -translate-x-1/2 text-white/50 text-[12px] whitespace-nowrap">
+            {imgIndex + 1} / {imgs.length} · <span className="lg:hidden">pinch or double-tap to zoom</span><span className="hidden lg:inline">scroll or double-click to zoom</span>
+          </p>
         </div>
       )}
 
