@@ -5,8 +5,10 @@ import { authenticate, authorize } from "../middleware/auth";
 const router = Router();
 
 router.get("/", getBodyTypes);
-router.post("/", authenticate, authorize(["SUPER_ADMIN"]), createBodyType);
-router.put("/:id", authenticate, authorize(["SUPER_ADMIN"]), updateBodyType);
+// Sub-admins add cars daily, so they can add/fix body types that are
+// missing. Deleting stays a super-admin action — cars reference these rows.
+router.post("/", authenticate, authorize(["SUPER_ADMIN", "SUB_ADMIN"]), createBodyType);
+router.put("/:id", authenticate, authorize(["SUPER_ADMIN", "SUB_ADMIN"]), updateBodyType);
 router.delete("/:id", authenticate, authorize(["SUPER_ADMIN"]), deleteBodyType);
 
 export default router;

@@ -16,9 +16,14 @@ interface Model {
 }
 
 import { useModal } from '../components/ui/ModalContext';
+import { useAuth } from '../lib/AuthContext';
 
 const MakerModelManager: React.FC = () => {
   const { showConfirm, showAlert } = useModal();
+  const { user } = useAuth();
+  // Sub-admins add and fix brands/models; deleting a brand (which cascades
+  // through its models) stays a super-admin action, matching the server.
+  const isSuper = user?.role === 'SUPER_ADMIN';
   const [makers, setMakers] = useState<Maker[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddMaker, setShowAddMaker] = useState(false);
@@ -266,6 +271,7 @@ const MakerModelManager: React.FC = () => {
                 >
                   <Edit size={16} />
                 </button>
+                {isSuper && (
                 <button
                   onClick={() => handleDeleteMaker(maker.id)}
                   className="p-2 rounded-lg text-gray-400 hover:text-coral hover:bg-coral/10 transition-colors"
@@ -273,6 +279,7 @@ const MakerModelManager: React.FC = () => {
                 >
                   <Trash2 size={16} />
                 </button>
+                )}
               </div>
             </div>
 

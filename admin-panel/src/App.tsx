@@ -110,8 +110,8 @@ function App() {
             <Route path="/leads" element={<RoleRoute allow={STAFF}><Suspense fallback={<PageLoader />}><LeadManagement /></Suspense></RoleRoute>} />
             <Route path="/viewings" element={<RoleRoute allow={STAFF}><Suspense fallback={<PageLoader />}><ViewingsManager /></Suspense></RoleRoute>} />
             <Route path="/payments" element={<RoleRoute allow={STAFF}><Suspense fallback={<PageLoader />}><PaymentVerificationQueue /></Suspense></RoleRoute>} />
-            <Route path="/maker-model" element={<RoleRoute allow={SUPER}><Suspense fallback={<PageLoader />}><MakerModelManager /></Suspense></RoleRoute>} />
-            <Route path="/body-type" element={<RoleRoute allow={SUPER}><Suspense fallback={<PageLoader />}><BodyTypeManager /></Suspense></RoleRoute>} />
+            <Route path="/maker-model" element={<RoleRoute allow={STAFF}><Suspense fallback={<PageLoader />}><MakerModelManager /></Suspense></RoleRoute>} />
+            <Route path="/body-type" element={<RoleRoute allow={STAFF}><Suspense fallback={<PageLoader />}><BodyTypeManager /></Suspense></RoleRoute>} />
             <Route path="/categories" element={<RoleRoute allow={SUPER}><Suspense fallback={<PageLoader />}><CategoryManager /></Suspense></RoleRoute>} />
             <Route path="/hero-images" element={<RoleRoute allow={STAFF}><Suspense fallback={<PageLoader />}><HeroImagesManager /></Suspense></RoleRoute>} />
             <Route path="/sell-requests" element={<RoleRoute allow={STAFF}><Suspense fallback={<PageLoader />}><SellRequestsManager /></Suspense></RoleRoute>} />

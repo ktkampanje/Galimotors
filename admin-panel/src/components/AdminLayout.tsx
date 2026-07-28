@@ -42,8 +42,8 @@ const NAV_SECTIONS = [
     id: 'catalogue',
     title: 'Catalogue',
     items: [
-      { icon: Layers, label: 'Makers & Models', path: '/maker-model', roles: ['SUPER_ADMIN'] },
-      { icon: LayoutGrid, label: 'Body Types', path: '/body-type', roles: ['SUPER_ADMIN'] },
+      { icon: Layers, label: 'Makers & Models', path: '/maker-model', roles: ['SUPER_ADMIN', 'SUB_ADMIN'] },
+      { icon: LayoutGrid, label: 'Body Types', path: '/body-type', roles: ['SUPER_ADMIN', 'SUB_ADMIN'] },
       { icon: MapPin, label: 'Districts & Logistics', path: '/locations', roles: ['SUPER_ADMIN', 'SUB_ADMIN'] },
       { icon: Store, label: 'Markets Ecosystem', path: '/markets', roles: ['SUPER_ADMIN', 'SUB_ADMIN'] },
       { icon: FileText, label: 'Content Pages', path: '/content-pages', roles: ['SUPER_ADMIN'] },

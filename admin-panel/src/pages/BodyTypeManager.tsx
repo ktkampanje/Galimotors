@@ -9,9 +9,14 @@ interface BodyType {
 }
 
 import { useModal } from '../components/ui/ModalContext';
+import { useAuth } from '../lib/AuthContext';
 
 const BodyTypeManager: React.FC = () => {
   const { showAlert, showConfirm } = useModal();
+  const { user } = useAuth();
+  // Sub-admins add and fix body types; deleting stays super-admin only,
+  // matching the server (cars reference these rows).
+  const isSuper = user?.role === 'SUPER_ADMIN';
   const [bodyTypes, setBodyTypes] = useState<BodyType[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -203,6 +208,7 @@ const BodyTypeManager: React.FC = () => {
                 >
                   <Edit size={14} />
                 </button>
+                {isSuper && (
                 <button
                   onClick={(e) => { e.stopPropagation(); handleDelete(bodyType.id); }}
                   className="p-2 rounded-lg bg-white text-gray-500 hover:text-coral hover:bg-coral/10 border border-gray-200 shadow-sm transition-colors"
@@ -210,6 +216,7 @@ const BodyTypeManager: React.FC = () => {
                 >
                   <Trash2 size={14} />
                 </button>
+                )}
               </div>
             </div>
             <div className="p-4 text-center bg-white flex-1 flex items-center justify-center">
