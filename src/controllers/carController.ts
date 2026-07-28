@@ -607,6 +607,19 @@ export const updateCar = async (req: Request, res: Response) => {
       },
     });
 
+    await prisma.activityLog.create({
+      data: {
+        userId: (req as any).user?.userId,
+        action: "UPDATE_CAR",
+        entityType: "Car",
+        entityId: id,
+        newValue: JSON.stringify({
+          title: car.title,
+          ...(existingCar.status !== car.status ? { statusChange: `${existingCar.status} → ${car.status}` } : {}),
+        }),
+      },
+    });
+
     // Invalidate filter stats cache after updating car
     invalidateFilterStatsCache();
 
@@ -872,6 +885,16 @@ export const markAsSold = async (req: Request, res: Response) => {
       },
     });
 
+    await prisma.activityLog.create({
+      data: {
+        userId: (req as any).user?.userId,
+        action: "MARK_SOLD",
+        entityType: "Car",
+        entityId: id,
+        newValue: JSON.stringify({ title: car.title, soldPrice: soldPrice || car.basePrice }),
+      },
+    });
+
     // Send notification to seller
     if (car.seller && car.seller.phone) {
       const notificationService =
@@ -914,6 +937,14 @@ export const bulkUpdateStatus = async (req: Request, res: Response) => {
     const result = await prisma.car.updateMany({
       where: { id: { in: carIds as string[] } },
       data: { status },
+    });
+    await prisma.activityLog.create({
+      data: {
+        userId: (req as any).user?.userId,
+        action: "BULK_UPDATE_STATUS",
+        entityType: "Car",
+        newValue: JSON.stringify({ status, count: (carIds as string[]).length }),
+      },
     });
     if (status === "SOLD") {
       await prisma.car.updateMany({

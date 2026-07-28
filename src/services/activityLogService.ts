@@ -79,7 +79,10 @@ export class ActivityLogService {
     if (userId) where.userId = userId;
     if (entityType) where.entityType = entityType;
     if (entityId) where.entityId = entityId;
-    if (action) where.action = action;
+    // Substring match: the UI filters by verb ("CREATE", "SOLD") while the
+    // stored actions are specific (CREATE_CAR, APPROVE_SOLD…). An exact
+    // match made every filter return nothing.
+    if (action) where.action = { contains: action };
     
     if (startDate || endDate) {
       where.createdAt = {};
@@ -99,11 +102,29 @@ export class ActivityLogService {
       prisma.activityLog.count({ where })
     ]);
 
+    // ActivityLog.userId is a plain string (no relation) so the actor must
+    // be resolved by hand — without this the page could only show a UUID,
+    // which defeats the entire point of an audit trail.
+    const userIds = [...new Set(logs.map(l => l.userId).filter(Boolean))] as string[];
+    const users = userIds.length
+      ? await prisma.user.findMany({
+          where: { id: { in: userIds } },
+          select: { id: true, name: true, email: true, role: true },
+        })
+      : [];
+    const userById = new Map(users.map(u => [u.id, u]));
+
+    const parse = (value: string | null) => {
+      if (!value) return null;
+      try { return JSON.parse(value); } catch { return value; }
+    };
+
     return {
       logs: logs.map(log => ({
         ...log,
-        oldValue: log.oldValue ? JSON.parse(log.oldValue) : null,
-        newValue: log.newValue ? JSON.parse(log.newValue) : null
+        user: (log.userId && userById.get(log.userId)) || null,
+        oldValue: parse(log.oldValue),
+        newValue: parse(log.newValue)
       })),
       pagination: {
         total,
@@ -176,16 +197,18 @@ export class ActivityLogService {
   async exportToCsv(filters: any): Promise<string> {
     const { logs } = await this.getActivityLogs({ ...filters, limit: 10000 });
     
-    const headers = ['Date', 'User ID', 'Action', 'Entity Type', 'Entity ID', 'IP Address', 'User Agent'];
+    const headers = ['Date', 'User', 'Role', 'Action', 'Entity Type', 'Entity ID', 'Details', 'IP Address', 'User Agent'];
     const csvRows = [headers.join(',')];
 
-    logs.forEach(log => {
+    logs.forEach((log: any) => {
       const row = [
         log.createdAt.toISOString(),
-        log.userId || '',
+        `"${log.user ? `${log.user.name} <${log.user.email}>` : log.userId || 'system'}"`,
+        log.user?.role || '',
         log.action,
         log.entityType,
         log.entityId || '',
+        `"${log.newValue ? JSON.stringify(log.newValue).replace(/"/g, '""') : ''}"`,
         log.ipAddress || '',
         `"${log.userAgent || ''}"` // Wrap in quotes to handle commas
       ];

@@ -17,6 +17,7 @@ interface ActivityLogEntry {
   user?: {
     name: string;
     email: string;
+    role: string;
   }
 }
 
@@ -92,6 +93,53 @@ const ActivityLog: React.FC = () => {
     }
   };
 
+  // Raw action codes (CREATE_CAR, APPROVE_SOLD...) read as machine noise —
+  // every row now states plainly what happened and to which record.
+  const ACTION_LABELS: Record<string, string> = {
+    CREATE_CAR: 'Added a car',
+    UPDATE_CAR: 'Edited a car',
+    DELETE_CAR: 'Moved a car to Trash',
+    RESTORE_CAR: 'Restored a car from Trash',
+    APPROVE_CAR: 'Approved a listing',
+    REJECT_CAR: 'Rejected a listing',
+    REQUEST_SOLD: 'Requested sold approval',
+    CANCEL_SOLD_REQUEST: 'Withdrew a sold request',
+    APPROVE_SOLD: 'Confirmed a sale',
+    REJECT_SOLD: 'Declined a sold request',
+    MARK_SOLD: 'Marked a car sold',
+    BULK_UPDATE_STATUS: 'Changed status in bulk',
+    CREATE_USER: 'Created a user account',
+    UPDATE_USER: 'Edited a user account',
+    DELETE_USER: 'Deleted a user account',
+    UPDATE_PROFILE: 'Updated their profile',
+    VIEW_USERS: 'Opened the users list',
+    LOGIN: 'Signed in',
+  };
+
+  const actionLabel = (action: string) =>
+    ACTION_LABELS[action] ||
+    action.replace(/_/g, ' ').toLowerCase().replace(/^./, c => c.toUpperCase());
+
+  const actionDetail = (log: ActivityLogEntry): string => {
+    const v = log.newValue;
+    if (!v || typeof v !== 'object') return '';
+    if (v.count && v.status) return `${v.count} car${v.count > 1 ? 's' : ''} → ${v.status}`;
+    const parts = [v.title || v.name || ''];
+    if (v.email && !parts[0]) parts[0] = v.email;
+    if (v.role) parts.push(String(v.role).replace(/_/g, ' '));
+    if (v.statusChange) parts.push(v.statusChange);
+    if (v.reason) parts.push(`reason: ${v.reason}`);
+    return parts.filter(Boolean).join(' · ');
+  };
+
+  const actionChip = (action: string) => {
+    if (/DELETE|REJECT/.test(action)) return 'bg-coral/10 text-coral border-coral/20';
+    if (/RESTORE|APPROVE|CREATE/.test(action)) return 'bg-success/10 text-success border-success/20';
+    if (/SOLD/.test(action)) return 'bg-info-light text-info border-info/20';
+    if (/LOGIN|SECURITY/.test(action)) return 'bg-gold-light text-gold-dark border-gold/20';
+    return 'bg-gray-100 text-gray-600 border-gray-200';
+  };
+
   const getEntityIcon = (type: string) => {
     switch (type.toLowerCase()) {
       case 'car': return <Box size={14} />;
@@ -115,10 +163,13 @@ const ActivityLog: React.FC = () => {
 
   const actionOptions = [
     { id: '', name: 'All Actions' },
-    { id: 'CREATE', name: 'Create' },
-    { id: 'UPDATE', name: 'Update' },
-    { id: 'DELETE', name: 'Delete' },
-    { id: 'LOGIN_SUCCESS', name: 'Logins' },
+    { id: 'CREATE', name: 'Created' },
+    { id: 'UPDATE', name: 'Edited' },
+    { id: 'DELETE', name: 'Deleted / Trashed' },
+    { id: 'RESTORE', name: 'Restored' },
+    { id: 'APPROVE', name: 'Approved' },
+    { id: 'SOLD', name: 'Sales & sold requests' },
+    { id: 'LOGIN', name: 'Sign-ins' },
   ];
 
   const entityOptions = [
@@ -270,17 +321,17 @@ const ActivityLog: React.FC = () => {
                      <tr key={log.id} className="group hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => setSelectedLog(log)}>
                        <td className="px-6 py-4">
                          <div className="flex items-center gap-3">
-                           <span className={`px-2 py-1 text-xs font-semibold rounded-md shadow-sm border transition-colors ${
-                             log.action.includes('CREATE') ? 'bg-pharmacore-gray text-dark border-gray-100' :
-                             log.action.includes('DELETE') ? 'bg-coral/10 text-coral border-coral/20' :
-                             log.action.includes('UPDATE') ? 'bg-pharmacore-gray text-dark border-gray-100' :
-                             'bg-gray-100 text-gray-600 border-gray-200'
-                           }`}>
+                           <span className={`shrink-0 px-2 py-1 text-[10px] font-bold uppercase tracking-wide rounded-md shadow-sm border ${actionChip(log.action)}`}>
                              {log.action.split('_')[0]}
                            </span>
-                           <div className="flex items-center gap-1.5 text-sm font-bold text-gray-900 group-hover:text-dark transition-colors">
-                              {getEntityIcon(log.entityType)}
-                              {log.action.toLowerCase().includes('login') ? 'Logged In' : `${log.entityType}`}
+                           <div className="min-w-0">
+                             <div className="flex items-center gap-1.5 text-sm font-bold text-gray-900 group-hover:text-dark transition-colors">
+                                {getEntityIcon(log.entityType)}
+                                {actionLabel(log.action)}
+                             </div>
+                             {actionDetail(log) && (
+                               <p className="text-xs font-medium text-gray-500 mt-0.5 truncate max-w-[280px]">{actionDetail(log)}</p>
+                             )}
                            </div>
                          </div>
                        </td>
@@ -294,7 +345,12 @@ const ActivityLog: React.FC = () => {
                              <div className="w-8 h-8 rounded-full bg-pharmacore-gray text-dark flex items-center justify-center font-bold text-xs overflow-hidden border border-gray-100">
                                <img src={`https://ui-avatars.com/api/?name=${log.user?.name || 'S'}&background=eff6ff&color=1d4ed8&rounded=false`} className="w-full h-full object-cover" />
                              </div>
-                             <span className="text-sm font-semibold text-gray-900">{log.user?.name || 'System Auto'}</span>
+                             <div className="flex flex-col">
+                               <span className="text-sm font-semibold text-gray-900">{log.user?.name || (log.userId ? 'Deleted user' : 'System')}</span>
+                               {log.user?.role && (
+                                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">{(log.user.role === 'SUB_ADMIN' ? 'ADMIN' : log.user.role).replace(/_/g, ' ')}</span>
+                               )}
+                             </div>
                           </div>
                        </td>
                        <td className="px-6 py-4 text-right">
@@ -353,8 +409,13 @@ const ActivityLog: React.FC = () => {
                        <span className="text-xs font-semibold text-gray-500">Performed By</span>
                        <span className="text-sm font-bold text-gray-900 flex items-center gap-2">
                            <div className="w-5 h-5 rounded-full bg-gray-100 overflow-hidden"><img src={`https://ui-avatars.com/api/?name=${selectedLog.user?.name || 'S'}&background=f3f4f6&color=111827&rounded=false`} className="w-full h-full object-cover" /></div>
-                           {selectedLog.user?.name || 'System Automation'}
+                           {selectedLog.user?.name || (selectedLog.userId ? 'Deleted user' : 'System')}
                        </span>
+                       {selectedLog.user && (
+                         <span className="text-xs font-medium text-gray-500">
+                           {selectedLog.user.email} · {(selectedLog.user.role === 'SUB_ADMIN' ? 'ADMIN' : selectedLog.user.role).replace(/_/g, ' ')}
+                         </span>
+                       )}
                     </div>
                     <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col gap-1">
                        <span className="text-xs font-semibold text-gray-500">Entity Details</span>
