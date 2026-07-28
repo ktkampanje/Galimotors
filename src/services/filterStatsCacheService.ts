@@ -10,7 +10,13 @@ interface FilterStats {
     '5m_15m': number;
     '15m_30m': number;
     '30m_50m': number;
-    above_50m: number;
+    '50m_100m': number;
+    '100m_200m': number;
+    '200m_300m': number;
+    '300m_400m': number;
+    '400m_500m': number;
+    '500m_600m': number;
+    above_600m: number;
   };
   yearRanges: {
     '2020_and_newer': number;
@@ -41,7 +47,13 @@ export async function calculateFilterStats(): Promise<FilterStats> {
     price5M_15M,
     price15M_30M,
     price30M_50M,
-    priceAbove50M
+    price50M_100M,
+    price100M_200M,
+    price200M_300M,
+    price300M_400M,
+    price400M_500M,
+    price500M_600M,
+    priceAbove600M
   ] = await Promise.all([
     prisma.car.groupBy({ by: ['condition'], where: whereClause, _count: { id: true } }),
     prisma.car.groupBy({ by: ['transmission'], where: whereClause, _count: { id: true } }),
@@ -52,7 +64,13 @@ export async function calculateFilterStats(): Promise<FilterStats> {
     prisma.car.count({ where: { ...whereClause, basePrice: { gte: 5000000, lt: 15000000 } } }),
     prisma.car.count({ where: { ...whereClause, basePrice: { gte: 15000000, lt: 30000000 } } }),
     prisma.car.count({ where: { ...whereClause, basePrice: { gte: 30000000, lt: 50000000 } } }),
-    prisma.car.count({ where: { ...whereClause, basePrice: { gte: 50000000 } } })
+    prisma.car.count({ where: { ...whereClause, basePrice: { gte: 50000000, lt: 100000000 } } }),
+    prisma.car.count({ where: { ...whereClause, basePrice: { gte: 100000000, lt: 200000000 } } }),
+    prisma.car.count({ where: { ...whereClause, basePrice: { gte: 200000000, lt: 300000000 } } }),
+    prisma.car.count({ where: { ...whereClause, basePrice: { gte: 300000000, lt: 400000000 } } }),
+    prisma.car.count({ where: { ...whereClause, basePrice: { gte: 400000000, lt: 500000000 } } }),
+    prisma.car.count({ where: { ...whereClause, basePrice: { gte: 500000000, lt: 600000000 } } }),
+    prisma.car.count({ where: { ...whereClause, basePrice: { gte: 600000000 } } })
   ]);
 
   // Calculate year ranges
@@ -88,7 +106,13 @@ export async function calculateFilterStats(): Promise<FilterStats> {
       '5m_15m': price5M_15M,
       '15m_30m': price15M_30M,
       '30m_50m': price30M_50M,
-      above_50m: priceAbove50M
+      '50m_100m': price50M_100M,
+      '100m_200m': price100M_200M,
+      '200m_300m': price200M_300M,
+      '300m_400m': price300M_400M,
+      '400m_500m': price400M_500M,
+      '500m_600m': price500M_600M,
+      above_600m: priceAbove600M
     },
 
     yearRanges: {

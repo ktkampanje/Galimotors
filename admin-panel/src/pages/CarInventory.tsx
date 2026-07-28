@@ -565,7 +565,7 @@ const CarInventory: React.FC = () => {
     }
     const price = parseFloat(form.basePrice.toString().replace(/,/g, ''));
     if (!price || price < 100000) { await showAlert({ title: 'Invalid Price', message: 'Price must be at least MK 100,000.', variant: 'warning' }); return; }
-    if (price > 100000000) { await showAlert({ title: 'Invalid Price', message: 'Price cannot exceed MK 100,000,000.', variant: 'warning' }); return; }
+    if (price > 2000000000) { await showAlert({ title: 'Invalid Price', message: 'Price cannot exceed MK 2,000,000,000.', variant: 'warning' }); return; }
     if (form.mileage && (parseInt(form.mileage) < 0 || parseInt(form.mileage) > 500000)) { await showAlert({ title: 'Invalid Mileage', message: 'Mileage must be between 0 and 500,000 km.', variant: 'warning' }); return; }
     if (!editingCar) {
       const missing = PHOTO_SLOTS.filter(s => s.required && !photoSlots[s.key]).map(s => s.label);

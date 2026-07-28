@@ -324,7 +324,13 @@ export const BrowseByPrice: React.FC = () => {
     { label: 'MK 5M – 15M',   min: '5000000',  max: '15000000', count: stats.priceRanges['5m_15m'] },
     { label: 'MK 15M – 30M',  min: '15000000', max: '30000000', count: stats.priceRanges['15m_30m'] },
     { label: 'MK 30M – 50M',  min: '30000000', max: '50000000', count: stats.priceRanges['30m_50m'] },
-    { label: 'Above MK 50M',  min: '50000000', max: '', count: stats.priceRanges.above_50m },
+    { label: 'MK 50M – 100M',  min: '50000000',  max: '100000000', count: stats.priceRanges['50m_100m'] ?? 0 },
+    { label: 'MK 100M – 200M', min: '100000000', max: '200000000', count: stats.priceRanges['100m_200m'] ?? 0 },
+    { label: 'MK 200M – 300M', min: '200000000', max: '300000000', count: stats.priceRanges['200m_300m'] ?? 0 },
+    { label: 'MK 300M – 400M', min: '300000000', max: '400000000', count: stats.priceRanges['300m_400m'] ?? 0 },
+    { label: 'MK 400M – 500M', min: '400000000', max: '500000000', count: stats.priceRanges['400m_500m'] ?? 0 },
+    { label: 'MK 500M – 600M', min: '500000000', max: '600000000', count: stats.priceRanges['500m_600m'] ?? 0 },
+    { label: 'Above MK 600M',  min: '600000000', max: '', count: stats.priceRanges.above_600m ?? 0 },
   ];
 
   const visibleRanges = visibleByCount(

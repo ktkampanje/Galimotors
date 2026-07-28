@@ -169,11 +169,13 @@ export const createCar = async (req: Request, res: Response) => {
       });
     }
 
-    // Price validation (MK 100,000 - 100,000,000)
+    // Price sanity bounds. The old 100M ceiling rejected real luxury
+    // listings — the catalogue now brackets prices up past 600M, so the
+    // cap is only a typo guard.
     const price = parseFloat(carData.basePrice);
-    if (price < 100000 || price > 100000000) {
+    if (price < 100000 || price > 2000000000) {
       return res.status(400).json({
-        message: "Price must be between MK 100,000 and MK 100,000,000",
+        message: "Price must be between MK 100,000 and MK 2,000,000,000",
       });
     }
 

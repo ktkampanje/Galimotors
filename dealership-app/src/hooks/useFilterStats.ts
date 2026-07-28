@@ -12,7 +12,15 @@ interface FilterStats {
     '5m_15m': number;
     '15m_30m': number;
     '30m_50m': number;
-    above_50m: number;
+    '50m_100m'?: number;
+    '100m_200m'?: number;
+    '200m_300m'?: number;
+    '300m_400m'?: number;
+    '400m_500m'?: number;
+    '500m_600m'?: number;
+    above_600m?: number;
+    /** legacy key from older cached stats — kept so a stale cache still parses */
+    above_50m?: number;
   };
   yearRanges: {
     '2020_and_newer': number;
@@ -34,7 +42,13 @@ const defaultStats: FilterStats = {
     '5m_15m': 0,
     '15m_30m': 0,
     '30m_50m': 0,
-    above_50m: 0
+    '50m_100m': 0,
+    '100m_200m': 0,
+    '200m_300m': 0,
+    '300m_400m': 0,
+    '400m_500m': 0,
+    '500m_600m': 0,
+    above_600m: 0
   },
   yearRanges: {
     '2020_and_newer': 0,
