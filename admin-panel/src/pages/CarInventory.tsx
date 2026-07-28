@@ -777,13 +777,37 @@ const CarInventory: React.FC = () => {
 
   // ── delete ────────────────────────────────────────────────────────────────────
   const handleDelete = async (carId: string) => {
-    const confirmed = await showConfirm({ title: 'Delete Vehicle', message: 'Permanently remove this car? This cannot be undone.', variant: 'danger', confirmLabel: 'Delete Permanently' });
+    const confirmed = await showConfirm({ title: 'Move to Trash', message: 'The car will disappear from the site immediately. It stays in the Trash tab for 7 days, where you can restore it — after that it is removed for good.', variant: 'danger', confirmLabel: 'Move to Trash' });
     if (!confirmed) return;
     try {
       await api.delete(`/cars/${carId}`);
       fetchData();
-      await showAlert({ title: 'Deleted', message: 'The car has been removed.', variant: 'info' });
+      fetchTrash();
+      await showAlert({ title: 'Moved to Trash', message: 'The car is off the site. Restore it from the Trash tab within 7 days if this was a mistake.', variant: 'info' });
     } catch { await showAlert({ title: 'Delete Failed', message: 'Could not remove the vehicle.', variant: 'error' }); }
+  };
+
+  // ── Trash (staff only): deleted cars waiting out their 7-day window ──
+  const [trashCars, setTrashCars] = useState<CarItem[]>([]);
+  const isStaffRole = userRole === 'SUPER_ADMIN' || userRole === 'SUB_ADMIN';
+
+  const fetchTrash = async () => {
+    if (!isStaffRole) return;
+    try {
+      const res = await api.get('/cars?trash=true&limit=500');
+      setTrashCars(res.data.cars || []);
+    } catch { /* trash list is non-critical */ }
+  };
+
+  useEffect(() => { fetchTrash(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [userRole]);
+
+  const handleRestore = async (carId: string) => {
+    try {
+      await api.post(`/cars/${carId}/restore`);
+      fetchData();
+      fetchTrash();
+      await showAlert({ title: 'Restored', message: 'The car is back in the inventory (same status it had before).', variant: 'success' });
+    } catch { await showAlert({ title: 'Restore Failed', message: 'Could not restore the vehicle.', variant: 'error' }); }
   };
 
   // ── sold request (sellers/attendants) ────────────────────────────────────────
@@ -1612,13 +1636,19 @@ const CarInventory: React.FC = () => {
           { id: 'RESERVED', label: 'Reserved' },
           { id: 'SOLD', label: 'Sold' },
           { id: 'HIDDEN', label: 'Hidden' },
+          // Deleted cars wait here for 7 days before the nightly purge —
+          // the safety net that makes Delete recoverable.
+          ...(isStaffRole ? [{ id: 'TRASH', label: 'Trash' }] : []),
         ];
+        const inTrashTab = invStatusFilter === 'TRASH';
         const countFor = (id: string) =>
+          id === 'TRASH' ? trashCars.length :
           id === 'ALL' ? cars.length : cars.filter(c => c.status === id).length;
 
         const q = invSearch.toLowerCase().trim();
-        const filteredCars = cars.filter(c => {
-          if (invStatusFilter !== 'ALL' && c.status !== invStatusFilter) return false;
+        const sourceCars = inTrashTab ? trashCars : cars;
+        const filteredCars = sourceCars.filter(c => {
+          if (!inTrashTab && invStatusFilter !== 'ALL' && c.status !== invStatusFilter) return false;
           if (!q) return true;
           return (
             c.title.toLowerCase().includes(q) ||
@@ -1768,8 +1798,13 @@ const CarInventory: React.FC = () => {
                         SOLD REQUESTED
                       </span>
                     )}
+                    {inTrashTab && (
+                      <span className="absolute top-8 left-2 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-red-600 text-white">
+                        IN TRASH
+                      </span>
+                    )}
                     {/* Checkbox — top-right (staff only; bulk ops are admin tools) */}
-                    {isStaff && (
+                    {isStaff && !inTrashTab && (
                     <label className="absolute top-2 right-2 cursor-pointer" onClick={e => e.stopPropagation()}>
                       <input
                         type="checkbox"
@@ -1804,7 +1839,15 @@ const CarInventory: React.FC = () => {
                         MK {car.basePrice?.toLocaleString('en-US')}
                       </p>
                       <div className="flex items-center gap-1">
-                        {isStaff ? (
+                        {inTrashTab ? (
+                          <button
+                            onClick={() => handleRestore(car.id)}
+                            className="px-2.5 py-1.5 rounded-md bg-success text-white text-[11px] font-bold hover:brightness-110 transition-all"
+                            title="Put this car back in the inventory"
+                          >
+                            Restore
+                          </button>
+                        ) : isStaff ? (
                           <>
                             <button
                               onClick={() => handleEdit(car)}

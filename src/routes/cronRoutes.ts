@@ -1,8 +1,10 @@
 import { Router } from "express";
-import { runSoldCarsCleanup } from "../jobs/soldCarsCleanupJob";
+import { runSoldCarsCleanup, runTrashPurge } from "../jobs/soldCarsCleanupJob";
 import { runReservationExpiry } from "../jobs/reservationExpiryJob";
 import { updateFilterStatsCache } from "../services/filterStatsCacheService";
 import { logServerError, pruneOldErrors } from "../services/errorLogService";
+import { EXPORT_ORDER } from "../scripts/dataOrder";
+import prisma from "../lib/prisma";
 
 /**
  * Scheduled maintenance for serverless hosting.
@@ -43,6 +45,7 @@ router.get("/daily", async (req, res) => {
   };
 
   await run("soldCarsCleanup", runSoldCarsCleanup);
+  await run("trashPurge", runTrashPurge);
   await run("reservationExpiry", runReservationExpiry);
   await run("filterStatsRefresh", updateFilterStatsCache);
   await run("errorLogPrune", async () => {
@@ -59,6 +62,33 @@ router.get("/daily", async (req, res) => {
 router.get("/test-error", (req, res) => {
   if (!guard(req, res)) return;
   throw new Error("Test error from /api/cron/test-error — if you can read this on the System Errors screen, monitoring works.");
+});
+
+/**
+ * Full-database dump for the daily off-site backup (GitHub Actions calls
+ * this, encrypts the result and stores it as a 30-day artifact). Same
+ * table order as the export/import scripts so a backup can be restored
+ * with `npm run data:import`. Contains customer PII — the CRON_SECRET
+ * guard is what stands between this and the public internet, and the
+ * workflow encrypts before storing.
+ */
+router.get("/backup", async (req, res) => {
+  if (!guard(req, res)) return;
+  try {
+    const data: Record<string, unknown[]> = {};
+    let total = 0;
+    for (const model of EXPORT_ORDER) {
+      const client = (prisma as any)[model];
+      if (!client?.findMany) continue;
+      const rows = await client.findMany();
+      data[model] = rows;
+      total += rows.length;
+    }
+    res.json({ exportedAt: new Date().toISOString(), totalRows: total, data });
+  } catch (error) {
+    logServerError("cron", error, { path: "/api/cron/backup" });
+    res.status(500).json({ message: "Backup export failed" });
+  }
 });
 
 export default router;

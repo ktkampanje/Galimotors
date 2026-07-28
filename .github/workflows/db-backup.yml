@@ -1,0 +1,60 @@
+# Daily off-site database backup.
+#
+# Pulls a full JSON dump from the live API (CRON_SECRET-guarded endpoint),
+# verifies it is real data, encrypts it (the repo is public — the dump
+# contains customer names and phone numbers), and stores it as a workflow
+# artifact for 30 days. Independent of both Vercel and Neon: even if the
+# database is wiped or the host is lost, the last 30 daily snapshots exist
+# here.
+#
+# Required repository secrets (Settings → Secrets and variables → Actions):
+#   CRON_SECRET     — same value as the Vercel env var
+#   BACKUP_ENC_KEY  — encryption passphrase (kept in NEW_SECRETS.local.txt)
+#
+# Restore: download the artifact, then
+#   openssl enc -d -aes-256-cbc -pbkdf2 -pass pass:<BACKUP_ENC_KEY> -in backup.json.enc -out backup.json
+#   DATABASE_URL="<neon url>" npm run data:import backup.json
+name: Daily database backup
+
+on:
+  schedule:
+    - cron: "30 3 * * *" # 03:30 UTC daily, after the app's own 02:00 cron
+  workflow_dispatch: {} # allow manual runs from the Actions tab
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download database dump
+        run: |
+          curl -sf --max-time 120 \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "https://galimotors.vercel.app/api/cron/backup" -o backup.json
+
+      - name: Verify the dump is real data
+        run: |
+          python3 - <<'EOF'
+          import json, sys
+          d = json.load(open("backup.json"))
+          rows = d.get("totalRows", 0)
+          tables = len(d.get("data", {}))
+          print(f"tables: {tables}, rows: {rows}")
+          # An empty or near-empty dump means the export is broken or the
+          # database is empty — fail loudly either way so it gets seen.
+          assert tables >= 10, f"only {tables} tables"
+          assert rows >= 20, f"only {rows} rows"
+          EOF
+
+      - name: Encrypt (public repo — dump contains customer PII)
+        run: |
+          openssl enc -aes-256-cbc -pbkdf2 \
+            -pass pass:${{ secrets.BACKUP_ENC_KEY }} \
+            -in backup.json -out backup.json.enc
+          rm backup.json
+
+      - name: Store as 30-day artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-backup-${{ github.run_number }}
+          path: backup.json.enc
+          retention-days: 30

@@ -198,3 +198,19 @@ request sends; pending/hidden cars are invisible to the public API even by
 direct ID; login is IP-throttled on failed attempts and per-account
 locked; server errors no longer leak stack traces or DB internals to
 clients.
+
+## Data protection (added 2026-07-28 after the inventory loss)
+
+- **Delete = Trash.** Deleting a car in the admin panel soft-deletes it (off the
+  site instantly, restorable from Inventory → Trash for 7 days). Only the daily
+  cron permanently purges trash — and it never deletes a Cloudinary file that
+  another car still references. Every delete/restore is in the Activity log.
+- **Daily off-site backup.** GitHub Actions (`.github/workflows/db-backup.yml`)
+  pulls a full dump from `/api/cron/backup` at 03:30 UTC, encrypts it
+  (AES-256, key = `BACKUP_ENC_KEY` in NEW_SECRETS.local.txt), and keeps it as a
+  workflow artifact for 30 days. Requires repo secrets `CRON_SECRET` and
+  `BACKUP_ENC_KEY`. Restore: decrypt per the workflow header, then
+  `DATABASE_URL="<neon>" npm run data:import backup.json`.
+- **Neon point-in-time restore.** The database itself can be restored to any
+  moment in the last 24h from console.neon.tech → Restore. This is the first
+  tool to reach for after any data accident.

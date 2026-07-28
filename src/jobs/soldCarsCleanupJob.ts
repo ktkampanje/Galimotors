@@ -117,6 +117,59 @@ export const runSoldCarsCleanup = async () => {
   }
 };
 
+/**
+ * Empty the trash — the ONLY place a car row is permanently destroyed.
+ * Runs from the daily cron; cars sit in the Trash (deletedAt set) for
+ * TRASH_RETENTION_DAYS first, restorable by any admin the whole time.
+ *
+ * Cloudinary guard: a photo file is only deleted when NO other car still
+ * references the same URL. Test listings shared pooled URLs with real
+ * cars once, and purging one car's files silently broke the others' —
+ * never again.
+ */
+export const TRASH_RETENTION_DAYS = 7;
+
+export const runTrashPurge = async () => {
+  const cutoff = new Date(Date.now() - TRASH_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+  const cars = await prisma.car.findMany({
+    where: { deletedAt: { lte: cutoff } },
+    include: { images: true },
+  });
+
+  let purged = 0;
+  for (const car of cars) {
+    const urls = [...new Set(car.images.map(img => img.url))];
+    const stillUsed = urls.length
+      ? await prisma.image.findMany({
+          where: { url: { in: urls }, carId: { not: car.id } },
+          select: { url: true },
+        })
+      : [];
+    const usedElsewhere = new Set(stillUsed.map(row => row.url));
+    const deletable = urls.filter(url => !usedElsewhere.has(url));
+
+    await prisma.car.delete({ where: { id: car.id } });
+    purged++;
+
+    if (deletable.length > 0) {
+      deleteCloudinaryImages(deletable).catch(error => {
+        console.error(`   ❌ Cloudinary purge failed for trashed car ${car.id}:`, error);
+      });
+    }
+    if (usedElsewhere.size > 0) {
+      console.log(`   ℹ️  Kept ${usedElsewhere.size} shared photo file(s) still used by other cars`);
+    }
+  }
+
+  if (purged > 0) {
+    console.log(`   ✅ Purged ${purged} trashed cars (${TRASH_RETENTION_DAYS}+ days in trash)`);
+    invalidateFilterStatsCache();
+  } else {
+    console.log('   ℹ️  Trash is empty (nothing older than the retention window)');
+  }
+  return { purged };
+};
+
 export const startSoldCarsCleanupJob = () => {
   // Run every day at 2:00 AM
   cron.schedule('0 2 * * *', async () => {
