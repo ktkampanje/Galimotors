@@ -251,8 +251,29 @@ export const createCar = async (req: Request, res: Response) => {
     res.status(201).json(car);
   } catch (error) {
     console.error("Failed to create car:", error);
-    res.status(500).json({ message: "Failed to create car" });
+    res.status(500).json({ message: "Failed to create car — " + describeCarSaveError(error) });
   }
+};
+
+/**
+ * Turn a thrown save error into a sentence the admin can act on. The
+ * generic "Failed to create car" hid the real cause both in the UI alert
+ * and on the System Errors screen (the capture middleware records the
+ * response message), which made live failures undiagnosable.
+ */
+const describeCarSaveError = (error: any): string => {
+  const code = error?.code as string | undefined;
+  if (code === "P2003") {
+    return "a selected item (maker, model, body type, market, seller or attendant) no longer exists on the server. Refresh the page and pick it again.";
+  }
+  if (code === "P2002") {
+    return "a value that must be unique is already used by another car.";
+  }
+  if (code === "P1001" || code === "P1002" || code === "P2024" || code === "P5010") {
+    return "the database did not respond in time. Wait a few seconds and press publish again — your photos and details are kept.";
+  }
+  const raw = String(error?.message || "unknown error").split("\n").filter((l) => l.trim()).pop() || "unknown error";
+  return raw.slice(0, 220);
 };
 
 export const getCars = async (req: Request, res: Response) => {
@@ -575,7 +596,7 @@ export const updateCar = async (req: Request, res: Response) => {
 
     res.json(car);
   } catch (error) {
-    res.status(500).json({ message: "Failed to update car" });
+    res.status(500).json({ message: "Failed to update car — " + describeCarSaveError(error) });
   }
 };
 
