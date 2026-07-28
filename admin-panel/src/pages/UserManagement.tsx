@@ -3,6 +3,7 @@ import { api } from '../lib/api';
 import { Plus, Edit2, Trash2, Shield, User, X, Lock, Store, Link2, UserPlus } from 'lucide-react';
 import { useModal } from '../components/ui/ModalContext';
 import CustomSelect from '../components/ui/CustomSelect';
+import PasswordInput from '../components/ui/PasswordInput';
 
 /**
  * Staff logins and their authority.
@@ -301,13 +302,10 @@ const UserManagement: React.FC = () => {
                 <label className="text-xs font-semibold text-gray-600">
                   Password {editingUser && <span className="text-gray-400 font-medium">(leave blank to keep current)</span>}
                 </label>
-                <input
-                  type="password"
+                <PasswordInput
                   required={!editingUser}
                   value={formData.password}
-                  onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
-                  className={inputCls}
-                  placeholder="••••••••"
+                  onChange={(val) => setFormData(prev => ({ ...prev, password: val }))}
                 />
                 {!editingUser && (
                   <p className="text-[11px] text-gray-400">At least 8 characters with uppercase, lowercase, a number and a symbol.</p>

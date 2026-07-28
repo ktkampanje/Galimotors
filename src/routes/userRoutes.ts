@@ -135,7 +135,7 @@ router.get("/profile", authenticate, async (req: AuthRequest, res: Response) => 
 
 router.put("/profile", authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const { name, currentPassword, newPassword } = req.body;
+    const { name, phone, currentPassword, newPassword } = req.body;
     const existing = await prisma.user.findUnique({ where: { id: req.user!.userId } });
     if (!existing) return res.status(404).json({ error: "User not found" });
 
@@ -153,6 +153,17 @@ router.put("/profile", authenticate, async (req: AuthRequest, res: Response) => 
       const strength = validatePasswordStrength(newPassword);
       if (!strength.valid) return res.status(400).json({ error: strength.errors.join(" ") });
       updateData.password = await hashPassword(newPassword);
+    }
+
+    // A seller/attendant may keep their own phone number current — it lives
+    // on the linked profile, which is what customers and admins see.
+    if (phone !== undefined) {
+      const cleanPhone = String(phone).trim();
+      if (cleanPhone.length < 7 || cleanPhone.length > 20) {
+        return res.status(400).json({ error: "Please enter a valid phone number" });
+      }
+      await prisma.seller.updateMany({ where: { userId: existing.id }, data: { phone: cleanPhone } });
+      await prisma.marketAttendant.updateMany({ where: { userId: existing.id }, data: { phone: cleanPhone } });
     }
 
     const updated = await prisma.user.update({

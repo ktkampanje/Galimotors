@@ -4,7 +4,7 @@ import {
   LayoutDashboard, CheckSquare, Target, Settings, LogOut,
   Search, Bell, Car, Users, LayoutGrid, Layers, MapPin, Activity, Tag, X,
   ChevronLeft, ChevronDown, Menu, Store, CheckCircle, MessageSquare, Eye, FileText, Image, HandCoins
-, AlertTriangle } from 'lucide-react';
+, AlertTriangle, UserCircle } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { api } from '../lib/api';
 /**
@@ -62,6 +62,7 @@ const NAV_SECTIONS = [
 ];
 
 const BOTTOM_ITEMS = [
+  { icon: UserCircle, label: 'My Profile', path: '/profile', roles: ['SUPER_ADMIN', 'SUB_ADMIN', 'SELLER', 'MARKET_ATTENDANT'] },
   { icon: Settings, label: 'Settings', path: '/settings', roles: ['SUPER_ADMIN', 'SUB_ADMIN'] },
 ];
 
@@ -880,6 +881,13 @@ export default function AdminLayout() {
 
                   {/* Menu items */}
                   <div className="py-1.5">
+                    <button
+                      onClick={() => { setProfileOpen(false); navigate('/profile'); }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-muted transition-colors"
+                    >
+                      <UserCircle size={15} className="text-text-tertiary" />
+                      <span className="text-[13px] font-medium text-text-primary">My Profile</span>
+                    </button>
                     {isStaff && (
                     <button
                       onClick={() => { setProfileOpen(false); navigate('/settings'); }}

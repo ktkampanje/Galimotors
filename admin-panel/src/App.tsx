@@ -26,6 +26,7 @@ const ActivityLog = lazy(() => import('./pages/ActivityLog'));
 const SystemErrors = lazy(() => import('./pages/SystemErrors'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const ViewingsManager = lazy(() => import('./pages/ViewingsManager'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -123,6 +124,7 @@ function App() {
             <Route path="/system-errors" element={<RoleRoute allow={STAFF}><Suspense fallback={<PageLoader />}><SystemErrors /></Suspense></RoleRoute>} />
             <Route path="/locations" element={<RoleRoute allow={STAFF}><Suspense fallback={<PageLoader />}><LocationManager /></Suspense></RoleRoute>} />
             <Route path="/settings" element={<RoleRoute allow={STAFF}><Suspense fallback={<PageLoader />}><SettingsPage /></Suspense></RoleRoute>} />
+            <Route path="/profile" element={<RoleRoute allow={FIELD}><Suspense fallback={<PageLoader />}><ProfilePage /></Suspense></RoleRoute>} />
           </Route>
 
           {/* Unknown paths funnel through the protected gate */}
