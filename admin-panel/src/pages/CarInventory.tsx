@@ -164,6 +164,9 @@ const CarInventory: React.FC = () => {
   const [invStatusFilter, setInvStatusFilter] = useState('ALL');
   const [searchParams] = useSearchParams();
   const [invSearch, setInvSearch] = useState(searchParams.get('search') || '');
+  // ?viewMarket=<id> — arriving from a market's page to see ITS cars only.
+  // (?marketId= is different: it opens the add-car form pre-filled.)
+  const [viewMarketId, setViewMarketId] = useState(searchParams.get('viewMarket') || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(null);
   const [viewingCar, setViewingCar] = useState<CarItem | null>(null);
@@ -1648,6 +1651,7 @@ const CarInventory: React.FC = () => {
         const q = invSearch.toLowerCase().trim();
         const sourceCars = inTrashTab ? trashCars : cars;
         const filteredCars = sourceCars.filter(c => {
+          if (viewMarketId && c.marketId !== viewMarketId) return false;
           if (!inTrashTab && invStatusFilter !== 'ALL' && c.status !== invStatusFilter) return false;
           if (!q) return true;
           return (
@@ -1712,6 +1716,16 @@ const CarInventory: React.FC = () => {
               placeholder="Search title, make, model, district, reg or chassis number…"
               className="filter-select w-full"
             />
+            {viewMarketId && (
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-coral-light text-coral text-[12px] font-bold rounded-lg">
+                  Market: {markets.find(m => m.id === viewMarketId)?.name || 'Unknown'}
+                  <button onClick={() => setViewMarketId('')} className="hover:text-coral-dark" title="Show all cars">
+                    <X size={13} />
+                  </button>
+                </span>
+              </div>
+            )}
           </div>
 
           {selectedCars.length > 0 && (

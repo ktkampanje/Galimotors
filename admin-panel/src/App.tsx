@@ -11,6 +11,7 @@ const PendingApprovalPage = lazy(() => import('./pages/PendingApprovalPage'));
 const LeadManagement = lazy(() => import('./pages/LeadManagement'));
 const PaymentVerificationQueue = lazy(() => import('./pages/PaymentVerificationQueue'));
 const MakerModelManager = lazy(() => import('./pages/MakerModelManager'));
+const MakerDetail = lazy(() => import('./pages/MakerDetail'));
 const BodyTypeManager = lazy(() => import('./pages/BodyTypeManager'));
 const CategoryManager = lazy(() => import('./pages/CategoryManager'));
 const HeroImagesManager = lazy(() => import('./pages/HeroImagesManager'));
@@ -112,6 +113,7 @@ function App() {
             <Route path="/viewings" element={<RoleRoute allow={STAFF}><Suspense fallback={<PageLoader />}><ViewingsManager /></Suspense></RoleRoute>} />
             <Route path="/payments" element={<RoleRoute allow={STAFF}><Suspense fallback={<PageLoader />}><PaymentVerificationQueue /></Suspense></RoleRoute>} />
             <Route path="/maker-model" element={<RoleRoute allow={STAFF}><Suspense fallback={<PageLoader />}><MakerModelManager /></Suspense></RoleRoute>} />
+            <Route path="/maker-model/:id" element={<RoleRoute allow={STAFF}><Suspense fallback={<PageLoader />}><MakerDetail /></Suspense></RoleRoute>} />
             <Route path="/body-type" element={<RoleRoute allow={STAFF}><Suspense fallback={<PageLoader />}><BodyTypeManager /></Suspense></RoleRoute>} />
             <Route path="/categories" element={<RoleRoute allow={SUPER}><Suspense fallback={<PageLoader />}><CategoryManager /></Suspense></RoleRoute>} />
             <Route path="/hero-images" element={<RoleRoute allow={STAFF}><Suspense fallback={<PageLoader />}><HeroImagesManager /></Suspense></RoleRoute>} />

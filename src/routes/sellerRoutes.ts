@@ -113,4 +113,53 @@ router.post('/', authenticate, authorize(['SUPER_ADMIN', 'SUB_ADMIN', 'MARKET_AT
   }
 });
 
+// Edit a seller's details. Admins only — a seller edits their own phone
+// via /users/profile, not here.
+router.put('/:id', authenticate, authorize(['SUPER_ADMIN', 'SUB_ADMIN']), async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const existing = await prisma.seller.findUnique({ where: { id } });
+    if (!existing) return res.status(404).json({ error: 'Seller not found' });
+
+    const { name, phone, district, marketId, sellerType, sellerStatus, verifiedByPlatform, notes } = req.body;
+    const data: any = {};
+    if (name) data.name = String(name);
+    if (phone) data.phone = String(phone);
+    if (district) data.district = String(district);
+    if (marketId !== undefined) data.marketId = marketId || null;
+    if (sellerType) data.sellerType = sellerType === 'DEALER' ? 'DEALER' : 'INDIVIDUAL';
+    if (sellerStatus && ['PENDING', 'APPROVED', 'SUSPENDED'].includes(sellerStatus)) data.sellerStatus = sellerStatus;
+    if (verifiedByPlatform !== undefined) data.verifiedByPlatform = !!verifiedByPlatform;
+    if (notes !== undefined) data.notes = notes || null;
+
+    const seller = await prisma.seller.update({ where: { id }, data });
+    res.json(seller);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update seller' });
+  }
+});
+
+// Delete a seller. Blocked while anything still depends on them: cars keep
+// their history, and a linked login would be orphaned mid-air.
+router.delete('/:id', authenticate, authorize(['SUPER_ADMIN']), async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const seller = await prisma.seller.findUnique({
+      where: { id },
+      select: { id: true, name: true, userId: true, _count: { select: { cars: true } } },
+    });
+    if (!seller) return res.status(404).json({ error: 'Seller not found' });
+    if (seller._count.cars > 0) {
+      return res.status(400).json({ error: `"${seller.name}" has ${seller._count.cars} car(s) in the system. Cars keep their seller for history — this seller cannot be deleted.` });
+    }
+    if (seller.userId) {
+      return res.status(400).json({ error: `"${seller.name}" has a login account linked. Delete or re-role the user first (Users page).` });
+    }
+    await prisma.seller.delete({ where: { id } });
+    res.json({ message: 'Seller deleted' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete seller' });
+  }
+});
+
 export default router;
