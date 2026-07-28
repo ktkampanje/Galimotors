@@ -4,7 +4,8 @@ import {
   softDeleteCar, restoreCar, createReservation, extendReservation,
   cancelReservation, markAsSold, bulkUpdateStatus, bulkUpdatePrice,
   getSimilarCars, getCarViewAnalytics, getSmartRankedCars,
-  getHomepageCars, getMoreCars, approveCar, rejectCar, getPendingApprovalCars
+  getHomepageCars, getMoreCars, approveCar, rejectCar, getPendingApprovalCars,
+  requestSold, cancelSoldRequest, getSoldRequests, approveSoldRequest, rejectSoldRequest
 } from "../controllers/carController";
 import { addCategoryToCar, removeCategoryFromCar } from "../controllers/categoryController";
 import { authenticate, authorize, optionalAuth } from "../middleware/auth";
@@ -18,6 +19,7 @@ router.get("/smart-search", getSmartRankedCars);
 
 // Admin routes - Approval workflow (GET must be before /:id)
 router.get("/pending-approval", authenticate, authorize(["SUPER_ADMIN", "SUB_ADMIN"]), getPendingApprovalCars);
+router.get("/sold-requests", authenticate, authorize(["SUPER_ADMIN", "SUB_ADMIN"]), getSoldRequests);
 
 // Public routes - Dynamic params
 // optionalAuth so an admin token is honoured: sellers see their own stock,
@@ -48,6 +50,13 @@ router.post("/:id/cancel-reservation", authenticate, authorize(["SUPER_ADMIN", "
 
 // Admin routes - Sales
 router.post("/:id/mark-sold", authenticate, authorize(["SUPER_ADMIN", "SUB_ADMIN"]), markAsSold);
+
+// Sold-approval workflow: sellers/attendants request, admins decide.
+// Ownership (own car / own market) is verified inside the controller.
+router.post("/:id/request-sold", authenticate, authorize(["SELLER", "MARKET_ATTENDANT"]), requestSold);
+router.post("/:id/cancel-sold-request", authenticate, authorize(["SELLER", "MARKET_ATTENDANT"]), cancelSoldRequest);
+router.post("/:id/approve-sold", authenticate, authorize(["SUPER_ADMIN", "SUB_ADMIN"]), approveSoldRequest);
+router.post("/:id/reject-sold", authenticate, authorize(["SUPER_ADMIN", "SUB_ADMIN"]), rejectSoldRequest);
 
 // Admin routes - Bulk operations (must be before /:id/... routes)
 router.post("/bulk/update-status", authenticate, authorize(["SUPER_ADMIN", "SUB_ADMIN"]), bulkUpdateStatus);

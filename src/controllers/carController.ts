@@ -117,6 +117,41 @@ export const createCar = async (req: Request, res: Response) => {
   try {
     const { images, ...carData } = req.body;
     const user = (req as any).user; // Get authenticated user
+
+    // Identity is NEVER taken from the request body for restricted roles.
+    // A seller lists under their own profile, full stop; an attendant lists
+    // into their own market, for a seller of that market. Without this, any
+    // seller could submit cars in another seller's name.
+    if (user?.role === "SELLER") {
+      const profile = await prisma.seller.findUnique({ where: { userId: user.userId } });
+      if (!profile) {
+        return res.status(403).json({ message: "Your login has no seller profile linked. Ask the administrator to link it from the Users page." });
+      }
+      carData.sellerId = profile.id;
+      carData.marketId = profile.marketId || null;
+      carData.attendantId = null;
+    } else if (user?.role === "MARKET_ATTENDANT") {
+      const attendant = await prisma.marketAttendant.findUnique({ where: { userId: user.userId } });
+      if (!attendant) {
+        return res.status(403).json({ message: "Your login has no attendant profile linked. Ask the administrator to link it from the Users page." });
+      }
+      carData.marketId = attendant.marketId;
+      carData.attendantId = attendant.id;
+      if (carData.sellerId) {
+        const chosenSeller = await prisma.seller.findUnique({ where: { id: carData.sellerId }, select: { marketId: true } });
+        if (!chosenSeller || chosenSeller.marketId !== attendant.marketId) {
+          return res.status(400).json({ message: "That seller is not registered under your market. You can only list cars for sellers in your market." });
+        }
+      }
+    }
+    // Marketing flags are an admin decision — strip them from restricted
+    // submissions so an approved car can't smuggle in Featured/Urgent badges.
+    if (user && (user.role === "SELLER" || user.role === "MARKET_ATTENDANT")) {
+      delete carData.isFeatured;
+      delete carData.urgentSaleBadge;
+      delete carData.platformInspectedBadge;
+    }
+
     const normalizedCarData = normalizeCarData(carData);
 
     // Input validation
@@ -427,12 +462,29 @@ export const getCarById = async (req: Request, res: Response) => {
       return res.status(404).json({ message: "Car not found" });
     }
 
-    // Approval gate for the public API: a car pending approval or hidden/
-    // rejected is invisible to non-admins even by direct ID. Without this a
-    // seller's unapproved listing was fully viewable to anyone holding its
-    // link. Admins (any signed-in admin role) still see every status.
+    // Privilege scope: full admins see everything; a seller or attendant is
+    // privileged only for THEIR OWN car (own seller profile / own market).
+    // For everyone else — including other sellers — the car behaves exactly
+    // like the public view: hidden statuses 404, internal prices stripped.
+    const user = (req as any).user;
+    let privileged = false;
+    if (user) {
+      if (user.role === "SUPER_ADMIN" || user.role === "SUB_ADMIN") {
+        privileged = true;
+      } else if (user.role === "SELLER") {
+        const profile = await prisma.seller.findUnique({ where: { userId: user.userId }, select: { id: true } });
+        privileged = !!profile && car.sellerId === profile.id;
+      } else if (user.role === "MARKET_ATTENDANT") {
+        const profile = await prisma.marketAttendant.findUnique({ where: { userId: user.userId }, select: { marketId: true } });
+        privileged = !!profile && !!car.marketId && car.marketId === profile.marketId;
+      }
+    }
+
+    // Approval gate: a car pending approval or hidden/rejected is invisible
+    // to the unprivileged even by direct ID. Without this a seller's
+    // unapproved listing was fully viewable to anyone holding its link.
     const PUBLIC_VISIBLE_STATUSES = ["AVAILABLE", "RESERVED", "SOLD"];
-    if (!(req as any).user && !PUBLIC_VISIBLE_STATUSES.includes(car.status)) {
+    if (!privileged && !PUBLIC_VISIBLE_STATUSES.includes(car.status)) {
       return res.status(404).json({ message: "Car not found" });
     }
 
@@ -448,7 +500,7 @@ export const getCarById = async (req: Request, res: Response) => {
     }
 
     // Seller's bottom line is internal — see the note in getCars.
-    if (!(req as any).user) {
+    if (!privileged) {
       const { sellerAskingPrice, ...publicCar } = car;
       return res.json(publicCar);
     }
@@ -742,6 +794,10 @@ export const markAsSold = async (req: Request, res: Response) => {
       data: {
         status: "SOLD",
         soldAt: new Date(), // Track when car was sold
+        // A direct admin sale settles any pending seller sold-request too.
+        soldRequestedAt: null,
+        soldRequestedById: null,
+        soldRequestedByName: null,
         ...(soldPrice && { basePrice: soldPrice }),
         ...(commissionAmount && {
           commissionAmount,
@@ -1521,5 +1577,223 @@ export const rejectCar = async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Failed to reject car:", error);
     res.status(500).json({ message: "Failed to reject car" });
+  }
+};
+
+// ==========================================
+// SOLD-APPROVAL WORKFLOW
+// ==========================================
+// Sellers and attendants cannot flip a car to SOLD themselves — a wrong (or
+// malicious) "sold" would silently pull a live listing off the site. They
+// file a request; an admin approves it, and only then does the car become
+// SOLD and disappear from the storefront.
+
+/**
+ * Whether this seller/attendant user governs this specific car:
+ * sellers own cars under their seller profile; attendants govern
+ * every car in their market.
+ */
+const canManageCar = async (
+  user: { userId: string; role: string },
+  car: { sellerId: string; marketId: string | null },
+): Promise<boolean> => {
+  if (user.role === "SELLER") {
+    const profile = await prisma.seller.findUnique({ where: { userId: user.userId }, select: { id: true } });
+    return !!profile && car.sellerId === profile.id;
+  }
+  if (user.role === "MARKET_ATTENDANT") {
+    const profile = await prisma.marketAttendant.findUnique({ where: { userId: user.userId }, select: { marketId: true } });
+    return !!profile && !!car.marketId && car.marketId === profile.marketId;
+  }
+  return false;
+};
+
+// Seller/attendant: ask the admin to mark this car sold
+export const requestSold = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const user = (req as any).user;
+
+    const car = await prisma.car.findUnique({ where: { id, deletedAt: null } });
+    if (!car) return res.status(404).json({ message: "Car not found" });
+
+    if (!(await canManageCar(user, car))) {
+      return res.status(403).json({ message: "You can only manage your own cars" });
+    }
+    if (car.status === "SOLD") {
+      return res.status(400).json({ message: "This car is already sold" });
+    }
+    if (car.status === "PENDING_APPROVAL" || car.status === "HIDDEN") {
+      return res.status(400).json({ message: "The listing must be approved and live before it can be marked sold" });
+    }
+    if (car.soldRequestedAt) {
+      return res.status(400).json({ message: "A sold request is already awaiting admin approval" });
+    }
+
+    const requester = await prisma.user.findUnique({ where: { id: user.userId }, select: { name: true } });
+    const updatedCar = await prisma.car.update({
+      where: { id },
+      data: {
+        soldRequestedAt: new Date(),
+        soldRequestedById: user.userId,
+        soldRequestedByName: requester?.name || user.role,
+      },
+    });
+
+    await prisma.activityLog.create({
+      data: {
+        userId: user.userId,
+        action: "REQUEST_SOLD",
+        entityType: "Car",
+        entityId: id,
+        newValue: JSON.stringify({ title: car.title, requestedBy: requester?.name }),
+      },
+    });
+
+    res.json({ message: "Sold request sent — an admin will confirm the sale", car: updatedCar });
+  } catch (error) {
+    console.error("Failed to request sold:", error);
+    res.status(500).json({ message: "Failed to request sold" });
+  }
+};
+
+// Seller/attendant: withdraw their own pending sold request
+export const cancelSoldRequest = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const user = (req as any).user;
+
+    const car = await prisma.car.findUnique({ where: { id, deletedAt: null } });
+    if (!car) return res.status(404).json({ message: "Car not found" });
+    if (!(await canManageCar(user, car))) {
+      return res.status(403).json({ message: "You can only manage your own cars" });
+    }
+    if (!car.soldRequestedAt) {
+      return res.status(400).json({ message: "There is no pending sold request on this car" });
+    }
+
+    const updatedCar = await prisma.car.update({
+      where: { id },
+      data: { soldRequestedAt: null, soldRequestedById: null, soldRequestedByName: null },
+    });
+
+    await prisma.activityLog.create({
+      data: {
+        userId: user.userId,
+        action: "CANCEL_SOLD_REQUEST",
+        entityType: "Car",
+        entityId: id,
+        newValue: JSON.stringify({ title: car.title }),
+      },
+    });
+
+    res.json({ message: "Sold request withdrawn", car: updatedCar });
+  } catch (error) {
+    console.error("Failed to cancel sold request:", error);
+    res.status(500).json({ message: "Failed to cancel sold request" });
+  }
+};
+
+// Admin: list cars with a pending sold request
+export const getSoldRequests = async (_req: Request, res: Response) => {
+  try {
+    const cars = await prisma.car.findMany({
+      where: {
+        soldRequestedAt: { not: null },
+        status: { not: "SOLD" },
+        deletedAt: null,
+      },
+      include: {
+        maker: { select: { id: true, name: true } },
+        model: { select: { id: true, name: true } },
+        seller: { select: { id: true, name: true, phone: true } },
+        market: { select: { id: true, name: true } },
+        images: true,
+      },
+      orderBy: { soldRequestedAt: "asc" },
+    });
+    res.json(cars);
+  } catch (error) {
+    console.error("Failed to fetch sold requests:", error);
+    res.status(500).json({ message: "Failed to fetch sold requests" });
+  }
+};
+
+// Admin: approve — the car becomes SOLD and leaves the storefront
+export const approveSoldRequest = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const user = (req as any).user;
+
+    const car = await prisma.car.findUnique({
+      where: { id, deletedAt: null },
+      include: { seller: { select: { name: true, phone: true } } },
+    });
+    if (!car) return res.status(404).json({ message: "Car not found" });
+    if (!car.soldRequestedAt) {
+      return res.status(400).json({ message: "This car has no pending sold request" });
+    }
+
+    const updatedCar = await prisma.car.update({
+      where: { id },
+      data: {
+        status: "SOLD",
+        soldAt: car.soldAt ?? new Date(),
+        soldRequestedAt: null,
+        soldRequestedById: null,
+        soldRequestedByName: null,
+      },
+    });
+
+    await prisma.activityLog.create({
+      data: {
+        userId: user.userId,
+        action: "APPROVE_SOLD",
+        entityType: "Car",
+        entityId: id,
+        newValue: JSON.stringify({ title: car.title, requestedBy: car.soldRequestedByName }),
+      },
+    });
+
+    invalidateFilterStatsCache();
+    res.json({ message: "Sale confirmed — the car is now marked sold", car: updatedCar });
+  } catch (error) {
+    console.error("Failed to approve sold request:", error);
+    res.status(500).json({ message: "Failed to approve sold request" });
+  }
+};
+
+// Admin: reject — the request is cleared, the car stays live
+export const rejectSoldRequest = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    const user = (req as any).user;
+
+    const car = await prisma.car.findUnique({ where: { id, deletedAt: null } });
+    if (!car) return res.status(404).json({ message: "Car not found" });
+    if (!car.soldRequestedAt) {
+      return res.status(400).json({ message: "This car has no pending sold request" });
+    }
+
+    const updatedCar = await prisma.car.update({
+      where: { id },
+      data: { soldRequestedAt: null, soldRequestedById: null, soldRequestedByName: null },
+    });
+
+    await prisma.activityLog.create({
+      data: {
+        userId: user.userId,
+        action: "REJECT_SOLD",
+        entityType: "Car",
+        entityId: id,
+        newValue: JSON.stringify({ title: car.title, requestedBy: car.soldRequestedByName, reason: reason || null }),
+      },
+    });
+
+    res.json({ message: "Sold request declined — the listing stays live", car: updatedCar });
+  } catch (error) {
+    console.error("Failed to reject sold request:", error);
+    res.status(500).json({ message: "Failed to reject sold request" });
   }
 };

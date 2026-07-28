@@ -23,7 +23,7 @@ const NAV_SECTIONS = [
     items: [
       { icon: LayoutDashboard, label: 'Overview', path: '/', roles: ['SUPER_ADMIN', 'SUB_ADMIN'] },
       { icon: MessageSquare, label: 'Customer Inquiries', path: '/leads', roles: ['SUPER_ADMIN', 'SUB_ADMIN'] },
-      { icon: Eye, label: 'Viewings', path: '/viewings', roles: ['SUPER_ADMIN', 'SUB_ADMIN', 'SELLER', 'MARKET_ATTENDANT'] },
+      { icon: Eye, label: 'Viewings', path: '/viewings', roles: ['SUPER_ADMIN', 'SUB_ADMIN'] },
       { icon: HandCoins, label: 'Sell Requests', path: '/sell-requests', roles: ['SUPER_ADMIN', 'SUB_ADMIN'] },
       { icon: CheckCircle, label: 'Pending Approval', path: '/pending-approval', roles: ['SUPER_ADMIN', 'SUB_ADMIN'] },
     ],
@@ -331,6 +331,10 @@ export default function AdminLayout() {
   const userRole = user?.role || 'SUB_ADMIN';
   const userName = user?.name || 'User';
   const userEmail = user?.email || '';
+  // Sellers and attendants live in their inventory only — the header search
+  // and notifications query admin-only endpoints (leads, sell requests),
+  // which would just 403 for them.
+  const isStaff = userRole === 'SUPER_ADMIN' || userRole === 'SUB_ADMIN';
 
   const handleLogout = async () => {
     await logout();
@@ -533,12 +537,13 @@ export default function AdminLayout() {
     }
   }, [lastSeenTime]);
 
-  // Initial fetch + poll every 60s
+  // Initial fetch + poll every 60s (admins only — the endpoints are theirs)
   useEffect(() => {
+    if (!isStaff) return;
     fetchNotifications();
     const interval = setInterval(fetchNotifications, 60000);
     return () => clearInterval(interval);
-  }, [fetchNotifications]);
+  }, [fetchNotifications, isStaff]);
 
   const unreadCount = notifications.filter(n => n.isNew).length;
 
@@ -596,6 +601,7 @@ export default function AdminLayout() {
               <Menu size={22} />
             </button>
             {/* ── Inline Search ── */}
+            {isStaff && (
             <div className="relative hidden sm:block w-full max-w-md" ref={searchRef}>
               <div className={`flex items-center bg-muted rounded-xl px-3 py-2 border transition-all duration-200 ${
                 searchFocused ? 'border-coral/40 ring-2 ring-coral/10 bg-surface shadow-sm' : 'border-transparent hover:border-border'
@@ -741,10 +747,12 @@ export default function AdminLayout() {
                 </div>
               )}
             </div>
+            )}
           </div>
 
           <div className="flex items-center gap-1.5">
             {/* ── Notifications ── */}
+            {isStaff && (
             <div className="relative" ref={notifRef}>
               <button
                 onClick={handleOpenNotifications}
@@ -825,6 +833,7 @@ export default function AdminLayout() {
                 </div>
               )}
             </div>
+            )}
 
             <div className="w-px h-5 bg-border mx-1"></div>
 
@@ -871,6 +880,7 @@ export default function AdminLayout() {
 
                   {/* Menu items */}
                   <div className="py-1.5">
+                    {isStaff && (
                     <button
                       onClick={() => { setProfileOpen(false); navigate('/settings'); }}
                       className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-muted transition-colors"
@@ -878,6 +888,7 @@ export default function AdminLayout() {
                       <Settings size={15} className="text-text-tertiary" />
                       <span className="text-[13px] font-medium text-text-primary">Settings</span>
                     </button>
+                    )}
                     {(userRole === 'SUPER_ADMIN') && (
                       <button
                         onClick={() => { setProfileOpen(false); navigate('/activity'); }}

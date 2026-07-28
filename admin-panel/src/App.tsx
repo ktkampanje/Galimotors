@@ -58,15 +58,35 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
 /** Login route: an already-verified admin is sent straight to the dashboard. */
 const LoginRoute = () => {
-  const { status } = useAuth();
+  const { status, user } = useAuth();
 
   if (status === 'checking') {
     return <AuthSplash />;
   }
   if (status === 'authed') {
-    return <Navigate to="/" replace />;
+    const role = user?.role || '';
+    return <Navigate to={role === 'SELLER' || role === 'MARKET_ATTENDANT' ? '/inventory' : '/'} replace />;
   }
   return <LoginPage />;
+};
+
+/**
+ * Route-level role guard. The sidebar already hides links per role, but
+ * hiding a link is not access control — anyone could type the URL. A user
+ * outside the allow list is bounced to their home page (sellers and
+ * attendants live in /inventory; admins on the Overview).
+ */
+const STAFF = ['SUPER_ADMIN', 'SUB_ADMIN'];
+const SUPER = ['SUPER_ADMIN'];
+const FIELD = ['SUPER_ADMIN', 'SUB_ADMIN', 'SELLER', 'MARKET_ATTENDANT'];
+
+const RoleRoute = ({ allow, children }: { allow: string[]; children: React.ReactNode }) => {
+  const { user } = useAuth();
+  const role = user?.role || '';
+  if (!allow.includes(role)) {
+    return <Navigate to={role === 'SELLER' || role === 'MARKET_ATTENDANT' ? '/inventory' : '/'} replace />;
+  }
+  return <>{children}</>;
 };
 
 import { ModalProvider } from './components/ui/ModalContext';
@@ -81,28 +101,28 @@ function App() {
           <Route path="/login" element={<LoginRoute />} />
           
           <Route element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}>
-            <Route path="/" element={<Suspense fallback={<PageLoader />}><AnalyticsDashboard /></Suspense>} />
-            <Route path="/analytics" element={<Suspense fallback={<PageLoader />}><AnalyticsDashboard /></Suspense>} />
-            <Route path="/inventory" element={<Suspense fallback={<PageLoader />}><CarInventory /></Suspense>} />
-            <Route path="/pending-approval" element={<Suspense fallback={<PageLoader />}><PendingApprovalPage /></Suspense>} />
-            <Route path="/markets" element={<Suspense fallback={<PageLoader />}><MarketManager /></Suspense>} />
-            <Route path="/markets/:id" element={<Suspense fallback={<PageLoader />}><MarketDetail /></Suspense>} />
-            <Route path="/leads" element={<Suspense fallback={<PageLoader />}><LeadManagement /></Suspense>} />
-            <Route path="/viewings" element={<Suspense fallback={<PageLoader />}><ViewingsManager /></Suspense>} />
-            <Route path="/payments" element={<Suspense fallback={<PageLoader />}><PaymentVerificationQueue /></Suspense>} />
-            <Route path="/maker-model" element={<Suspense fallback={<PageLoader />}><MakerModelManager /></Suspense>} />
-            <Route path="/body-type" element={<Suspense fallback={<PageLoader />}><BodyTypeManager /></Suspense>} />
-            <Route path="/categories" element={<Suspense fallback={<PageLoader />}><CategoryManager /></Suspense>} />
-            <Route path="/hero-images" element={<Suspense fallback={<PageLoader />}><HeroImagesManager /></Suspense>} />
-            <Route path="/sell-requests" element={<Suspense fallback={<PageLoader />}><SellRequestsManager /></Suspense>} />
-            <Route path="/content-pages" element={<Suspense fallback={<PageLoader />}><ContentPages /></Suspense>} />
-            <Route path="/commissions" element={<Suspense fallback={<PageLoader />}><CommissionDashboard /></Suspense>} />
-            <Route path="/users" element={<Suspense fallback={<PageLoader />}><UserManagement /></Suspense>} />
-            <Route path="/bulk" element={<Suspense fallback={<PageLoader />}><BulkOperations /></Suspense>} />
-            <Route path="/activity" element={<Suspense fallback={<PageLoader />}><ActivityLog /></Suspense>} />
-            <Route path="/system-errors" element={<Suspense fallback={<PageLoader />}><SystemErrors /></Suspense>} />
-            <Route path="/locations" element={<Suspense fallback={<PageLoader />}><LocationManager /></Suspense>} />
-            <Route path="/settings" element={<Suspense fallback={<PageLoader />}><SettingsPage /></Suspense>} />
+            <Route path="/" element={<RoleRoute allow={STAFF}><Suspense fallback={<PageLoader />}><AnalyticsDashboard /></Suspense></RoleRoute>} />
+            <Route path="/analytics" element={<RoleRoute allow={STAFF}><Suspense fallback={<PageLoader />}><AnalyticsDashboard /></Suspense></RoleRoute>} />
+            <Route path="/inventory" element={<RoleRoute allow={FIELD}><Suspense fallback={<PageLoader />}><CarInventory /></Suspense></RoleRoute>} />
+            <Route path="/pending-approval" element={<RoleRoute allow={STAFF}><Suspense fallback={<PageLoader />}><PendingApprovalPage /></Suspense></RoleRoute>} />
+            <Route path="/markets" element={<RoleRoute allow={STAFF}><Suspense fallback={<PageLoader />}><MarketManager /></Suspense></RoleRoute>} />
+            <Route path="/markets/:id" element={<RoleRoute allow={STAFF}><Suspense fallback={<PageLoader />}><MarketDetail /></Suspense></RoleRoute>} />
+            <Route path="/leads" element={<RoleRoute allow={STAFF}><Suspense fallback={<PageLoader />}><LeadManagement /></Suspense></RoleRoute>} />
+            <Route path="/viewings" element={<RoleRoute allow={STAFF}><Suspense fallback={<PageLoader />}><ViewingsManager /></Suspense></RoleRoute>} />
+            <Route path="/payments" element={<RoleRoute allow={STAFF}><Suspense fallback={<PageLoader />}><PaymentVerificationQueue /></Suspense></RoleRoute>} />
+            <Route path="/maker-model" element={<RoleRoute allow={SUPER}><Suspense fallback={<PageLoader />}><MakerModelManager /></Suspense></RoleRoute>} />
+            <Route path="/body-type" element={<RoleRoute allow={SUPER}><Suspense fallback={<PageLoader />}><BodyTypeManager /></Suspense></RoleRoute>} />
+            <Route path="/categories" element={<RoleRoute allow={SUPER}><Suspense fallback={<PageLoader />}><CategoryManager /></Suspense></RoleRoute>} />
+            <Route path="/hero-images" element={<RoleRoute allow={STAFF}><Suspense fallback={<PageLoader />}><HeroImagesManager /></Suspense></RoleRoute>} />
+            <Route path="/sell-requests" element={<RoleRoute allow={STAFF}><Suspense fallback={<PageLoader />}><SellRequestsManager /></Suspense></RoleRoute>} />
+            <Route path="/content-pages" element={<RoleRoute allow={SUPER}><Suspense fallback={<PageLoader />}><ContentPages /></Suspense></RoleRoute>} />
+            <Route path="/commissions" element={<RoleRoute allow={STAFF}><Suspense fallback={<PageLoader />}><CommissionDashboard /></Suspense></RoleRoute>} />
+            <Route path="/users" element={<RoleRoute allow={SUPER}><Suspense fallback={<PageLoader />}><UserManagement /></Suspense></RoleRoute>} />
+            <Route path="/bulk" element={<RoleRoute allow={STAFF}><Suspense fallback={<PageLoader />}><BulkOperations /></Suspense></RoleRoute>} />
+            <Route path="/activity" element={<RoleRoute allow={SUPER}><Suspense fallback={<PageLoader />}><ActivityLog /></Suspense></RoleRoute>} />
+            <Route path="/system-errors" element={<RoleRoute allow={STAFF}><Suspense fallback={<PageLoader />}><SystemErrors /></Suspense></RoleRoute>} />
+            <Route path="/locations" element={<RoleRoute allow={STAFF}><Suspense fallback={<PageLoader />}><LocationManager /></Suspense></RoleRoute>} />
+            <Route path="/settings" element={<RoleRoute allow={STAFF}><Suspense fallback={<PageLoader />}><SettingsPage /></Suspense></RoleRoute>} />
           </Route>
 
           {/* Unknown paths funnel through the protected gate */}

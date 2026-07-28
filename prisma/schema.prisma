@@ -207,6 +207,11 @@ model Car {
   // Status & Reservation
   status                 String    @default("PENDING_APPROVAL") // AVAILABLE, VIEWING_SCHEDULED, RESERVED, SOLD, HIDDEN, PENDING_APPROVAL
   soldAt                 DateTime? // Timestamp when car was marked as SOLD
+  // Sold-approval gate: sellers/attendants cannot mark SOLD directly — they
+  // file a request; an admin approves it before the car leaves the site.
+  soldRequestedAt        DateTime?
+  soldRequestedById      String?   // User.id of the requester
+  soldRequestedByName    String?   // display name captured at request time
   reservationFeeRequired Boolean   @default(false)
   reservationExpiry      DateTime?
   reservedByLeadId       String?       

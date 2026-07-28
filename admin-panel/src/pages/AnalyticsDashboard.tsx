@@ -28,6 +28,7 @@ interface DashboardData {
   actionQueues: {
     pendingPayments: number;
     pendingApprovalCars: number;
+    pendingSoldRequests?: number;
     newSellRequests: number;
     systemErrors: number;
     expiringReservations: { id: string; title: string; reservationExpiry: string }[];
@@ -121,6 +122,12 @@ export default function AnalyticsDashboard() {
     actions.push({
       label: `${queues.pendingApprovalCars} car${queues.pendingApprovalCars > 1 ? 's' : ''} awaiting approval`,
       detail: 'Submitted by sellers or attendants', urgent: false, to: '/pending-approval', icon: <ShieldCheck size={15} />,
+    });
+  }
+  if (queues?.pendingSoldRequests) {
+    actions.push({
+      label: `${queues.pendingSoldRequests} sold request${queues.pendingSoldRequests > 1 ? 's' : ''} to confirm`,
+      detail: 'Sellers say these cars are sold — confirm to delist', urgent: true, to: '/pending-approval', icon: <ShieldCheck size={15} />,
     });
   }
   if (queues?.newSellRequests) {

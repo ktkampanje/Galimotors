@@ -1,11 +1,25 @@
 import { Request, Response } from "express";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import prisma from "../lib/prisma";
 
 export const getAttendants = async (req: Request, res: Response) => {
   try {
+    // Scoped directory: admins see all, an attendant sees their own market's
+    // colleagues, a seller has no business with the attendant directory.
+    const user = (req as any).user;
+    let where: any = undefined;
+    if (user?.role === "SELLER") {
+      return res.json([]);
+    }
+    if (user?.role === "MARKET_ATTENDANT") {
+      const self = await prisma.marketAttendant.findUnique({
+        where: { userId: user.userId },
+        select: { marketId: true },
+      });
+      where = self ? { marketId: self.marketId } : { id: "none" };
+    }
+
     const attendants = await prisma.marketAttendant.findMany({
+      where,
       orderBy: { name: 'asc' },
       include: {
         market: { select: { id: true, name: true, district: true } },

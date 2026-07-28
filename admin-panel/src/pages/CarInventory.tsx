@@ -38,6 +38,8 @@ interface CarItem {
   sellerId?: string;
   marketId?: string;
   attendantId?: string;
+  soldRequestedAt?: string | null;
+  soldRequestedByName?: string | null;
   logbookAvailable?: boolean;
   dutyPaid?: boolean;
   registered?: boolean;
@@ -168,6 +170,11 @@ const CarInventory: React.FC = () => {
   const extraInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
   const userRole = user?.role || '';
+  // Field roles (seller / market attendant) get a narrowed inventory: the
+  // server scopes /cars and /sellers to them, identity fields are assigned
+  // server-side, and SOLD only happens via an admin-approved request.
+  const isStaff = userRole === 'SUPER_ADMIN' || userRole === 'SUB_ADMIN';
+  const isFieldRole = userRole === 'SELLER' || userRole === 'MARKET_ATTENDANT';
 
   // Seller modal
   const [showSellerModal, setShowSellerModal] = useState(false);
@@ -198,6 +205,34 @@ const CarInventory: React.FC = () => {
   };
   const [form, setForm] = useState(defaultForm);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
+
+  // For SELLER the scoped /sellers response is exactly their own profile;
+  // for MARKET_ATTENDANT the scoped /attendants response is their market's
+  // team, so any row carries the market. The server enforces the same
+  // assignment regardless of what the client sends — this is display + UX.
+  const mySeller = userRole === 'SELLER' ? sellers[0] : undefined;
+  const myMarket = userRole === 'MARKET_ATTENDANT' && attendants[0]
+    ? { id: attendants[0].marketId, name: attendants[0].market?.name || 'Your market', district: attendants[0].market?.district || '' }
+    : undefined;
+
+  useEffect(() => {
+    if (!showAddForm || editingCar) return;
+    if (userRole === 'SELLER' && mySeller) {
+      setForm(prev => ({
+        ...prev,
+        sellerId: mySeller.id,
+        marketId: mySeller.marketId || '',
+        district: prev.district || mySeller.district || '',
+      }));
+    } else if (userRole === 'MARKET_ATTENDANT' && myMarket) {
+      setForm(prev => ({
+        ...prev,
+        marketId: myMarket.id,
+        district: prev.district || myMarket.district || '',
+      }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showAddForm, editingCar, userRole, sellers, attendants]);
 
   // Photo state
   const [photoSlots, setPhotoSlots] = useState<Record<string, File | string | null>>({
@@ -529,7 +564,7 @@ const CarInventory: React.FC = () => {
       if (missing.length > 0) { await showAlert({ title: 'Missing Required Photos', message: `Please add: ${missing.join(', ')}`, variant: 'warning' }); return; }
     }
     if (!form.district.trim()) { await showAlert({ title: 'Validation Error', message: 'District is required.', variant: 'warning' }); return; }
-    if (!form.sellerId) { await showAlert({ title: 'Validation Error', message: 'Please select a seller.', variant: 'warning' }); return; }
+    if (userRole !== 'SELLER' && !form.sellerId) { await showAlert({ title: 'Validation Error', message: 'Please select a seller.', variant: 'warning' }); return; }
     if (form.registered && !form.registrationNumber?.trim()) { await showAlert({ title: 'Documentation Error', message: 'Registration number is required for registered vehicles.', variant: 'warning' }); return; }
 
     setIsSubmitting(true);
@@ -629,7 +664,9 @@ const CarInventory: React.FC = () => {
       await showAlert(
         editingCar
           ? { title: 'Updated Successfully', message: 'Vehicle details have been refreshed.', variant: 'success' }
-          : { title: 'Listing Published', message: 'Vehicle is now live on the marketplace.', variant: 'success' }
+          : isFieldRole
+            ? { title: 'Submitted for Approval', message: 'Your car has been sent to the admin. It will appear on the site once approved.', variant: 'success' }
+            : { title: 'Listing Published', message: 'Vehicle is now live on the marketplace.', variant: 'success' }
       );
 
       closeForm();
@@ -733,6 +770,42 @@ const CarInventory: React.FC = () => {
     } catch { await showAlert({ title: 'Delete Failed', message: 'Could not remove the vehicle.', variant: 'error' }); }
   };
 
+  // ── sold request (sellers/attendants) ────────────────────────────────────────
+  const handleRequestSold = async (car: CarItem) => {
+    const confirmed = await showConfirm({
+      title: 'Mark as Sold?',
+      message: `Tell the admin "${car.title}" has been sold? The listing stays on the site until an admin confirms the sale.`,
+      variant: 'info',
+      confirmLabel: 'Send Request',
+    });
+    if (!confirmed) return;
+    try {
+      await api.post(`/cars/${car.id}/request-sold`);
+      await showAlert({ title: 'Request Sent', message: 'An admin will confirm the sale. The car leaves the site once approved.', variant: 'success' });
+      fetchData();
+    } catch (error) {
+      const apiError = error as { response?: { data?: { message?: string } } };
+      await showAlert({ title: 'Could Not Send Request', message: apiError.response?.data?.message || 'Please try again.', variant: 'error' });
+    }
+  };
+
+  const handleCancelSoldRequest = async (car: CarItem) => {
+    const confirmed = await showConfirm({
+      title: 'Withdraw Sold Request',
+      message: `Withdraw the pending sold request for "${car.title}"? The listing simply stays live.`,
+      variant: 'info',
+      confirmLabel: 'Withdraw',
+    });
+    if (!confirmed) return;
+    try {
+      await api.post(`/cars/${car.id}/cancel-sold-request`);
+      fetchData();
+    } catch (error) {
+      const apiError = error as { response?: { data?: { message?: string } } };
+      await showAlert({ title: 'Could Not Withdraw', message: apiError.response?.data?.message || 'Please try again.', variant: 'error' });
+    }
+  };
+
   // ── bulk ──────────────────────────────────────────────────────────────────────
   const handleBulkStatusUpdate = async (status: string) => {
     const confirmed = await showConfirm({ title: 'Bulk Status Update', message: `Update ${selectedCars.length} cars to ${status}?`, variant: 'info', confirmLabel: 'Update Status' });
@@ -768,8 +841,8 @@ const CarInventory: React.FC = () => {
   const submitLabel = uploadProgress
     ? `Uploading photo ${uploadProgress.done}/${uploadProgress.total}…`
     : isSubmitting
-      ? (editingCar ? 'Saving…' : 'Publishing…')
-      : (editingCar ? 'Save Changes' : 'Publish Listing');
+      ? (editingCar ? 'Saving…' : isFieldRole ? 'Submitting…' : 'Publishing…')
+      : (editingCar ? 'Save Changes' : isFieldRole ? 'Submit for Approval' : 'Publish Listing');
 
   // ── return ────────────────────────────────────────────────────────────────────
   return (
@@ -827,6 +900,11 @@ const CarInventory: React.FC = () => {
                   placeholder="Select type"
                 />
               </div>
+              {userRole === 'MARKET_ATTENDANT' ? (
+                <p className="text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5">
+                  The seller will be registered under <span className="font-bold text-gray-700">{myMarket?.name || 'your market'}</span>.
+                </p>
+              ) : (
               <div className="space-y-1.5">
                 <label className="text-sm font-semibold text-gray-700">Market (Optional)</label>
                 <CustomSelect
@@ -836,6 +914,7 @@ const CarInventory: React.FC = () => {
                   placeholder="Select market"
                 />
               </div>
+              )}
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setShowSellerModal(false)} className="flex-1 py-2.5 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-colors">Cancel</button>
                 <button type="submit" disabled={savingSeller} className="flex-1 py-2.5 bg-coral text-white font-semibold rounded-xl hover:bg-coral/90 shadow-md shadow-coral/20 transition-colors disabled:opacity-60">
@@ -1222,6 +1301,68 @@ const CarInventory: React.FC = () => {
             {/* ── Step 4: Source & Seller ── */}
             <div className="card-widget p-4 md:p-6">
               <SectionHeader step={4} icon={<Users size={20} />} title="Source & Seller" sub="Where the car is and who is selling it" />
+              {userRole === 'SELLER' ? (
+                /* A seller only ever lists as themselves — identity is fixed
+                   server-side; they just say where the car is. */
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="px-4 py-3 bg-gray-50 rounded-xl border border-gray-100">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Listing as</p>
+                    {mySeller ? (
+                      <>
+                        <p className="text-sm font-bold text-gray-900">{mySeller.name}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">{mySeller.district}{mySeller.marketId ? ` · ${markets.find(m => m.id === mySeller.marketId)?.name || 'your market'}` : ''}</p>
+                      </>
+                    ) : (
+                      <p className="text-sm font-semibold text-coral">No seller profile is linked to your login yet — ask the administrator to link it before adding cars.</p>
+                    )}
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-semibold text-gray-700">District *</label>
+                    <CustomSelect
+                      value={form.district}
+                      onChange={val => setForm({ ...form, district: val })}
+                      options={toSelectOptions(districts, 'name', 'name')}
+                      placeholder="Select district"
+                    />
+                    <p className="text-xs text-gray-500">Where the car currently is — viewing distances are calculated from here.</p>
+                  </div>
+                </div>
+              ) : userRole === 'MARKET_ATTENDANT' ? (
+                /* An attendant lists into their own market only; the seller
+                   must belong to that market (list already comes scoped). */
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="px-4 py-3 bg-gray-50 rounded-xl border border-gray-100">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Your market</p>
+                    {myMarket ? (
+                      <p className="text-sm font-bold text-gray-900">{myMarket.name} <span className="text-xs text-gray-500 font-medium">· {myMarket.district}</span></p>
+                    ) : (
+                      <p className="text-sm font-semibold text-coral">No attendant profile is linked to your login yet — ask the administrator to link it before adding cars.</p>
+                    )}
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-semibold text-gray-700">District *</label>
+                    <CustomSelect
+                      value={form.district}
+                      onChange={val => setForm({ ...form, district: val })}
+                      options={toSelectOptions(districts, 'name', 'name')}
+                      placeholder="Select district"
+                    />
+                    <p className="text-xs text-gray-500">Viewing distances are calculated from here.</p>
+                  </div>
+                  <div className="space-y-1.5 md:col-span-2">
+                    <label className="text-sm font-semibold text-gray-700 flex items-center justify-between">
+                      Seller *
+                      <button type="button" onClick={() => setShowSellerModal(true)} className="text-xs text-coral hover:underline font-semibold">+ New Seller</button>
+                    </label>
+                    <CustomSelect
+                      value={form.sellerId}
+                      onChange={val => setForm({ ...form, sellerId: val })}
+                      options={sellers.map(s => ({ id: s.id, name: `${s.name} (${s.phone})` }))}
+                      placeholder="Select a seller from your market"
+                    />
+                  </div>
+                </div>
+              ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-sm font-semibold text-gray-700">Market *</label>
@@ -1277,6 +1418,7 @@ const CarInventory: React.FC = () => {
                   />
                 </div>
               </div>
+              )}
             </div>
 
             {/* ── Step 5: Documentation & Status ── */}
@@ -1605,7 +1747,13 @@ const CarInventory: React.FC = () => {
                     }`}>
                       {car.status === 'PENDING_APPROVAL' ? 'PENDING' : car.status}
                     </span>
-                    {/* Checkbox — top-right */}
+                    {car.soldRequestedAt && car.status !== 'SOLD' && (
+                      <span className="absolute top-8 left-2 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-warning text-white">
+                        SOLD REQUESTED
+                      </span>
+                    )}
+                    {/* Checkbox — top-right (staff only; bulk ops are admin tools) */}
+                    {isStaff && (
                     <label className="absolute top-2 right-2 cursor-pointer" onClick={e => e.stopPropagation()}>
                       <input
                         type="checkbox"
@@ -1617,6 +1765,7 @@ const CarInventory: React.FC = () => {
                         className="w-4 h-4 text-coral border-gray-300 rounded focus:ring-coral cursor-pointer"
                       />
                     </label>
+                    )}
                     {/* Image count + zoom — bottom-right */}
                     {car.images && car.images.length > 0 && (
                       <button
@@ -1639,20 +1788,42 @@ const CarInventory: React.FC = () => {
                         MK {car.basePrice?.toLocaleString('en-US')}
                       </p>
                       <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => handleEdit(car)}
-                          className="w-7 h-7 flex items-center justify-center rounded-md bg-gray-50 text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
-                          title="Edit"
-                        >
-                          <Edit size={13} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(car.id)}
-                          className="w-7 h-7 flex items-center justify-center rounded-md bg-gray-50 text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 size={13} />
-                        </button>
+                        {isStaff ? (
+                          <>
+                            <button
+                              onClick={() => handleEdit(car)}
+                              className="w-7 h-7 flex items-center justify-center rounded-md bg-gray-50 text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+                              title="Edit"
+                            >
+                              <Edit size={13} />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(car.id)}
+                              className="w-7 h-7 flex items-center justify-center rounded-md bg-gray-50 text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </>
+                        ) : car.soldRequestedAt && car.status !== 'SOLD' ? (
+                          <button
+                            onClick={() => handleCancelSoldRequest(car)}
+                            className="px-2.5 py-1.5 rounded-md bg-warning/10 text-warning text-[10px] font-bold hover:bg-warning/20 transition-colors"
+                            title="Withdraw the pending sold request"
+                          >
+                            Withdraw request
+                          </button>
+                        ) : ['AVAILABLE', 'RESERVED', 'VIEWING_SCHEDULED'].includes(car.status) ? (
+                          <button
+                            onClick={() => handleRequestSold(car)}
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-success text-white text-[11px] font-bold hover:brightness-110 transition-all"
+                            title="Ask the admin to confirm this car is sold"
+                          >
+                            <CheckCircle size={12} /> Mark sold
+                          </button>
+                        ) : car.status === 'PENDING_APPROVAL' ? (
+                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Awaiting approval</span>
+                        ) : null}
                       </div>
                     </div>
                   </div>
