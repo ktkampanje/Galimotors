@@ -585,8 +585,11 @@ const HomePage: React.FC = () => {
             {/* Empty — filter copy only makes sense in grid mode; on the
                 showroom it used to tell visitors to clear filters they
                 never set. */}
+            {/* Fixed comfortable padding, never h-full: a percentage height
+                here once ballooned the card over the footer when parent
+                heights disagreed. */}
             {!loading && recentCars.length === 0 && (
-              <div className="h-full flex flex-col justify-center items-center p-8  border border-border bg-muted/20 text-center">
+              <div className="flex flex-col justify-center items-center px-8 py-20 border border-border bg-muted/20 text-center">
                 <Search size={32} className="text-text-tertiary mb-3 opacity-40" />
                 <p className="text-[14px] font-medium text-text-secondary">
                   {isGrid ? 'No vehicles found' : 'No vehicles available yet'}
