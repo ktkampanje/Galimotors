@@ -161,6 +161,14 @@ export const createCar = async (req: Request, res: Response) => {
       });
     }
 
+    // Every image entry must carry a URL — a client that lost an upload
+    // used to crash the create with an opaque 500 here.
+    if (images && (!Array.isArray(images) || images.some((img: any) => typeof img?.url !== "string" || !img.url))) {
+      return res.status(400).json({
+        message: "One or more photos did not finish uploading. Please re-add your photos and publish again.",
+      });
+    }
+
     // Price validation (MK 100,000 - 100,000,000)
     const price = parseFloat(carData.basePrice);
     if (price < 100000 || price > 100000000) {
@@ -309,6 +317,12 @@ export const getCars = async (req: Request, res: Response) => {
     const where: Prisma.CarWhereInput = {
       deletedAt: null,
     };
+
+    // Trash view (admins only): deleted cars awaiting restore or purge.
+    const isStaff = user && (user.role === "SUPER_ADMIN" || user.role === "SUB_ADMIN");
+    if (isStaff && req.query.trash === "true") {
+      where.deletedAt = { not: null };
+    }
 
     // Role-based filtering and status defaults
     if (user) {
@@ -600,39 +614,57 @@ export const updateCar = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * Delete = TRASH, never instant destruction. This replaced a hard delete
+ * that destroyed the row, its images, its leads (cascade) AND the
+ * Cloudinary files in one unlogged click — which is how a live inventory
+ * was lost with no trace of who did it. Now: the car goes invisible
+ * everywhere (deletedAt) but sits in the Trash tab, restorable by any
+ * admin, for TRASH_RETENTION_DAYS. Only the daily cleanup permanently
+ * removes it — and every trash/restore is written to the activity log
+ * with the acting user.
+ */
+export const TRASH_RETENTION_DAYS = 7;
+
 export const deleteCar = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    
-    // Get car with images before deleting
+    const user = (req as any).user;
+
     const car = await prisma.car.findUnique({
       where: { id },
-      include: { images: true }
+      select: { id: true, title: true, status: true, deletedAt: true },
     });
-
     if (!car) {
       return res.status(404).json({ message: "Car not found" });
     }
-
-    // Delete car from database (cascades to images)
-    await prisma.car.delete({ where: { id } });
-
-    // Delete images from Cloudinary (async, don't wait)
-    if (car.images.length > 0) {
-      const imageUrls = car.images.map(img => img.url);
-      deleteCloudinaryImages(imageUrls).catch(error => {
-        console.error('Failed to delete Cloudinary images:', error);
-      });
+    if (car.deletedAt) {
+      return res.status(400).json({ message: "This car is already in the trash" });
     }
 
-    // Invalidate filter stats cache after deleting car
+    const updated = await prisma.car.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
+
+    await prisma.activityLog.create({
+      data: {
+        userId: user?.userId,
+        action: "DELETE_CAR",
+        entityType: "Car",
+        entityId: id,
+        newValue: JSON.stringify({ title: car.title, status: car.status, mode: "trash" }),
+      },
+    });
+
     invalidateFilterStatsCache();
 
-    res.json({ 
-      message: "Car deleted successfully",
-      imagesDeleted: car.images.length
+    res.json({
+      message: `Car moved to Trash — it can be restored for ${TRASH_RETENTION_DAYS} days`,
+      car: updated,
     });
   } catch (error) {
+    console.error("Failed to trash car:", error);
     res.status(500).json({ message: "Failed to delete car" });
   }
 };
@@ -661,10 +693,21 @@ export const softDeleteCar = async (req: Request, res: Response) => {
 export const restoreCar = async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
+    const user = (req as any).user;
 
     const car = await prisma.car.update({
       where: { id },
       data: { deletedAt: null },
+    });
+
+    await prisma.activityLog.create({
+      data: {
+        userId: user?.userId,
+        action: "RESTORE_CAR",
+        entityType: "Car",
+        entityId: id,
+        newValue: JSON.stringify({ title: car.title }),
+      },
     });
 
     // Invalidate filter stats cache after restoring car

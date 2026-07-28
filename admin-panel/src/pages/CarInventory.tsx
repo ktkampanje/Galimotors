@@ -285,6 +285,14 @@ const CarInventory: React.FC = () => {
       reader.readAsDataURL(file);
     });
 
+  // browser-image-compression returns a File OR a Blob depending on the
+  // browser. Everything downstream (the upload filter, the identity maps)
+  // assumes File — on browsers that hand back a Blob, photos silently
+  // skipped the upload and publishing died with "Argument url is missing".
+  // Normalize once, here.
+  const asFile = (out: File | Blob, original: File): File =>
+    out instanceof File ? out : new File([out], original.name, { type: out.type || original.type });
+
   const getPreviewUrl = (img: File | string): string => {
     if (typeof img === 'string') return img;
     let url = previewUrls.current.get(img);
@@ -430,7 +438,7 @@ const CarInventory: React.FC = () => {
 
       let stored: File = original;
       try {
-        stored = await imageCompression(original, COMPRESS_OPTIONS);
+        stored = asFile(await imageCompression(original, COMPRESS_OPTIONS), original);
       } catch {
         // Keep the original — the server-side transform is the backstop.
       }
@@ -482,7 +490,7 @@ const CarInventory: React.FC = () => {
 
       const compressed = await Promise.all(unique.map(async u => {
         let stored = u.file;
-        try { stored = await imageCompression(u.file, COMPRESS_OPTIONS); } catch { /* keep original */ }
+        try { stored = asFile(await imageCompression(u.file, COMPRESS_OPTIONS), u.file); } catch { /* keep original */ }
         fileHashes.current.set(stored, u.hash);
         return stored;
       }));
@@ -576,7 +584,10 @@ const CarInventory: React.FC = () => {
       let imageUrls: { url: string; isPrimary: boolean }[] = [];
 
       if (allImages.length > 0) {
-        const newFiles = allImages.filter((img): img is File => img instanceof File);
+        // "Not a URL string" — NOT instanceof File. Some browsers' image
+        // compression yields Blobs; an instanceof File filter silently left
+        // those photos un-uploaded and the publish failed server-side.
+        const newFiles = allImages.filter((img): img is File => typeof img !== 'string');
         const uploadedByFile = new Map<File, string>();
 
         if (newFiles.length > 0) {
@@ -615,6 +626,11 @@ const CarInventory: React.FC = () => {
           url: typeof img === 'string' ? img : uploadedByFile.get(img)!,
           isPrimary: idx === 0,
         }));
+
+        // Never send a broken payload: every entry must carry a real URL.
+        if (imageUrls.some(entry => !entry.url)) {
+          throw new Error('Some photos did not finish uploading. Please press publish again — already-uploaded photos are kept.');
+        }
       }
       setUploadProgress(null);
 
