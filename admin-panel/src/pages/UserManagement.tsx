@@ -87,9 +87,14 @@ const UserManagement: React.FC = () => {
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
   const needsProfile = (role: string) => role === 'SELLER' || role === 'MARKET_ATTENDANT';
-  // On edit, the profile section only matters when the role is CHANGING into
-  // seller/attendant — the server re-links profiles only on a role change.
-  const showProfileSection = needsProfile(formData.role) && (!editingUser || editingUser.role !== formData.role);
+  // On edit, the profile section appears when the role is CHANGING into
+  // seller/attendant — or when the account is ALREADY that role but has no
+  // profile linked (accounts created before linking existed): the repair path.
+  const editingUnlinked = !!editingUser && needsProfile(editingUser.role)
+    && editingUser.role === formData.role
+    && !editingUser.sellerProfile && !editingUser.attendantProfile;
+  const showProfileSection = needsProfile(formData.role)
+    && (!editingUser || editingUser.role !== formData.role || editingUnlinked);
 
   const validate = (): string | null => {
     if (!editingUser && !formData.password) return 'A password is required for a new login.';

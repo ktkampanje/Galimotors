@@ -299,6 +299,17 @@ router.put("/:id", authenticate, authorize(["SUPER_ADMIN"]), async (req: AuthReq
         if ("error" in step) return res.status(400).json({ error: step.error });
         profileStep = step;
       }
+    } else if (
+      // Repair path: accounts created before profile linking existed can be
+      // SELLER/ATTENDANT with no profile — which scopes them to nothing.
+      // Editing such an account with link/create details attaches one.
+      ((existing.role === "SELLER" && !existing.sellerProfile) ||
+        (existing.role === "MARKET_ATTENDANT" && !existing.attendantProfile)) &&
+      (req.body.linkSellerId || req.body.linkAttendantId || req.body.phone)
+    ) {
+      const step = await buildProfileStep(existing.role, req.body);
+      if ("error" in step) return res.status(400).json({ error: step.error });
+      profileStep = step;
     }
 
     const updated = await prisma.$transaction(async (tx) => {
