@@ -4,7 +4,7 @@ import {
   LayoutDashboard, CheckSquare, Target, Settings, LogOut,
   Search, Bell, Car, Users, LayoutGrid, Layers, MapPin, Activity, Tag, X,
   ChevronLeft, ChevronDown, Menu, Store, CheckCircle, MessageSquare, Eye, FileText, Image, HandCoins
-, AlertTriangle, UserCircle } from 'lucide-react';
+, AlertTriangle, UserCircle, Megaphone } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { api } from '../lib/api';
 /**
@@ -53,6 +53,7 @@ const NAV_SECTIONS = [
     id: 'business',
     title: 'Business',
     items: [
+      { icon: Megaphone, label: 'Marketing', path: '/marketing', roles: ['SUPER_ADMIN', 'SUB_ADMIN'] },
       { icon: Target, label: 'Commissions', path: '/commissions', roles: ['SUPER_ADMIN', 'SUB_ADMIN'] },
       { icon: Users, label: 'Users', path: '/users', roles: ['SUPER_ADMIN'] },
       { icon: Activity, label: 'Activity', path: '/activity', roles: ['SUPER_ADMIN'] },

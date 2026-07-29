@@ -13,6 +13,7 @@
     { "source": "/api/:path*", "destination": "/api/index" },
     { "source": "/sitemap.xml", "destination": "/api/index" },
     { "source": "/robots.txt", "destination": "/api/index" },
+    { "source": "/cars/:makerSlug/:modelSlug/:ref", "destination": "/api/index" },
     { "source": "/admin", "destination": "/admin/index.html" },
     { "source": "/admin/:path*", "destination": "/admin/index.html" },
     { "source": "/:path*", "destination": "/index.html" }

@@ -1,5 +1,6 @@
 import prisma from '../lib/prisma';
 import { getAdminWhatsApp } from '../lib/businessContact';
+import { getSiteUrl } from '../lib/siteUrl';
 
 interface SitemapUrl {
   url: string;
@@ -9,10 +10,23 @@ interface SitemapUrl {
 }
 
 export class SEOService {
-  private baseUrl: string;
+  // Always the DEPLOYED host. The old constructor default hardcoded
+  // https://galimotors.com — a domain the live site does not use, so every
+  // sitemap/canonical/OG URL pointed somewhere else entirely.
+  private get baseUrl(): string {
+    return getSiteUrl();
+  }
 
-  constructor(baseUrl: string = 'https://galimotors.com') {
-    this.baseUrl = baseUrl;
+  /**
+   * Social-preview version of a car photo: WhatsApp/Facebook want ~1200×630.
+   * Cloudinary does the crop on the fly; non-Cloudinary URLs pass through.
+   */
+  toOgImage(url: string | undefined | null): string {
+    if (!url) return `${this.baseUrl}/og-image.png`;
+    if (url.includes('/upload/') && !url.includes('/upload/w_')) {
+      return url.replace('/upload/', '/upload/w_1200,h_630,c_fill,q_auto/');
+    }
+    return url;
   }
 
   // Generate SEO-friendly slug from car data
@@ -44,9 +58,9 @@ export class SEOService {
   generateCarOpenGraph(car: any) {
     const canonicalUrl = this.generateCarCanonicalUrl(car);
     const description = this.generateCarMetaDescription(car);
-    const primaryImage = car.images?.find((img: any) => img.isPrimary)?.url || 
-                        car.images?.[0]?.url || 
-                        `${this.baseUrl}/default-car-image.jpg`;
+    const primaryImage = this.toOgImage(
+      car.images?.find((img: any) => img.isPrimary)?.url || car.images?.[0]?.url
+    );
 
     return {
       'og:title': car.title,

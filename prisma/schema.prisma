@@ -241,6 +241,20 @@ model Car {
   leads                  Lead[]
 }
 
+// ============== MARKETING =================== //
+// Composed ads (Marketing page): kept for reuse and as a record of who
+// promoted what, where, when. carId is a plain reference — the ad text
+// outlives the car.
+model AdPost {
+  id            String   @id @default(uuid())
+  caption       String
+  carId         String?
+  channel       String   // WHATSAPP, FACEBOOK, BOTH
+  createdById   String?
+  createdByName String?
+  createdAt     DateTime @default(now())
+}
+
 // ============== RELATIONS & IMAGES =========== //
 model Image {
   id        String   @id @default(uuid())
