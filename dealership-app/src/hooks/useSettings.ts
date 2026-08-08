@@ -16,7 +16,7 @@ interface GlobalSettings {
 const defaultSettings: GlobalSettings = {
   adminWhatsApp: '265990000000',
   adminPhone: '265990000000',
-  businessEmail: 'info@galimotors.com',
+  businessEmail: 'info@galimotor.com',
   driverAllowance: 15000,
   accommodationFee: 25000,
   facebookUrl: '',

@@ -14,6 +14,19 @@ import {
   clearLoginAttempts,
 } from "../utils/auth";
 import { sanitizePhone } from "../middleware/sanitize";
+import {
+  consumeVerificationToken,
+  createVerificationToken,
+} from "../lib/verificationTokens";
+import {
+  sendPasswordResetEmail,
+  sendVerificationEmail,
+} from "../lib/authEmails";
+
+// Same wording whatever happened, so this endpoint cannot be used to discover
+// which email addresses have accounts.
+const RESET_REQUEST_RESPONSE =
+  "If an account exists for that email, a password reset link is on its way.";
 
 const getCustomerId = (req: Request) =>
   (req as any).customer?.customerId || (req as any).customer?.id;
@@ -75,6 +88,7 @@ export const registerCustomer = async (req: Request, res: Response) => {
         name: true,
         phone: true,
         district: true,
+        emailVerified: true,
         createdAt: true,
       },
     });
@@ -93,6 +107,21 @@ export const registerCustomer = async (req: Request, res: Response) => {
     } catch (claimError) {
       // Claiming is best-effort; never fail a registration over it.
       console.error("Failed to claim guest leads for new customer:", claimError);
+    }
+
+    // Confirmation email. Awaited deliberately: on Vercel the function stops
+    // executing the moment the response is sent, so a fire-and-forget send
+    // would be killed in flight and silently never arrive. Failures are
+    // swallowed — an email outage must not turn a good signup into an error,
+    // and verification is non-blocking anyway.
+    try {
+      const verifyToken = await createVerificationToken(
+        customer.id,
+        "EMAIL_VERIFY",
+      );
+      await sendVerificationEmail(customer.email, customer.name, verifyToken);
+    } catch (emailError) {
+      console.error("Failed to send verification email on signup:", emailError);
     }
 
     // Generate CUSTOMER tokens
@@ -382,5 +411,183 @@ export const logoutCustomer = async (req: Request, res: Response) => {
     res.json({ message: "Logged out successfully" });
   } catch (error) {
     res.status(500).json({ error: "Logout failed" });
+  }
+};
+
+// ==========================================
+// PASSWORD RESET
+// ==========================================
+
+/**
+ * Step 1 — request a reset link.
+ *
+ * Answers identically whether or not the address is registered. Saying "no
+ * account with that email" would make this endpoint a membership oracle,
+ * letting anyone test a breach dump against your customer list. The same
+ * reasoning already governs login and quickLoginCheck above.
+ */
+export const forgotPassword = async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: "Email is required" });
+    }
+
+    const customer = await prisma.customer.findUnique({
+      where: { email: sanitizeEmail(email) },
+    });
+
+    if (customer) {
+      const token = await createVerificationToken(
+        customer.id,
+        "PASSWORD_RESET",
+      );
+      const sent = await sendPasswordResetEmail(
+        customer.email,
+        customer.name,
+        token,
+      );
+
+      // Logged, never surfaced: the caller must not be able to tell a send
+      // failure from a non-existent account. A broken provider shows up on
+      // the admin System Errors screen instead.
+      if (!sent) {
+        console.error(
+          "[auth] Password reset email failed to send to %s",
+          customer.email,
+        );
+      }
+    }
+
+    res.json({ message: RESET_REQUEST_RESPONSE });
+  } catch (error) {
+    console.error("Forgot password error:", error);
+    res.json({ message: RESET_REQUEST_RESPONSE });
+  }
+};
+
+/** Step 2 — spend the token and set the new password. */
+export const resetPassword = async (req: Request, res: Response) => {
+  try {
+    const { token, password } = req.body;
+
+    if (!token || !password) {
+      return res
+        .status(400)
+        .json({ error: "Reset token and new password are required" });
+    }
+
+    // Same policy as registration — a reset must not be a way around it.
+    if (typeof password !== "string" || password.length < 8) {
+      return res
+        .status(400)
+        .json({ error: "Password must be at least 8 characters long" });
+    }
+
+    const customerId = await consumeVerificationToken(token, "PASSWORD_RESET");
+
+    if (!customerId) {
+      return res.status(400).json({
+        error:
+          "This reset link is invalid, expired, or has already been used. Request a new one.",
+      });
+    }
+
+    const customer = await prisma.customer.update({
+      where: { id: customerId },
+      data: {
+        password: await hashPassword(password),
+        // Opening the link proves control of the inbox, which is the only
+        // thing verification asks for. No reason to ask again.
+        emailVerified: true,
+      },
+      select: { email: true },
+    });
+
+    // Someone resetting a password has usually just locked themselves out
+    // guessing. Leaving the lockout in place would block the very login they
+    // are about to attempt with the password they just chose.
+    clearLoginAttempts(`customer:${customer.email}`);
+
+    res.json({
+      message: "Password updated. You can now sign in with your new password.",
+    });
+  } catch (error) {
+    console.error("Reset password error:", error);
+    res.status(500).json({ error: "Could not reset password" });
+  }
+};
+
+// ==========================================
+// EMAIL VERIFICATION
+// ==========================================
+
+/** Confirms an address from the link in the signup email. */
+export const verifyEmail = async (req: Request, res: Response) => {
+  try {
+    const { token } = req.body;
+
+    const customerId = await consumeVerificationToken(token, "EMAIL_VERIFY");
+
+    if (!customerId) {
+      return res.status(400).json({
+        error:
+          "This confirmation link is invalid, expired, or has already been used.",
+      });
+    }
+
+    await prisma.customer.update({
+      where: { id: customerId },
+      data: { emailVerified: true },
+    });
+
+    res.json({ message: "Email address confirmed." });
+  } catch (error) {
+    console.error("Verify email error:", error);
+    res.status(500).json({ error: "Could not confirm email address" });
+  }
+};
+
+/**
+ * Re-sends the confirmation email to the signed-in customer.
+ *
+ * Unlike forgotPassword this caller is already authenticated, so there is no
+ * account to enumerate and a send failure can be reported honestly.
+ */
+export const resendVerification = async (req: Request, res: Response) => {
+  try {
+    const customerId = getCustomerId(req);
+
+    const customer = await prisma.customer.findUnique({
+      where: { id: customerId },
+      select: { id: true, email: true, name: true, emailVerified: true },
+    });
+
+    if (!customer) {
+      return res.status(404).json({ error: "Customer not found" });
+    }
+
+    if (customer.emailVerified) {
+      return res.json({ message: "Your email address is already confirmed." });
+    }
+
+    const token = await createVerificationToken(customer.id, "EMAIL_VERIFY");
+    const sent = await sendVerificationEmail(
+      customer.email,
+      customer.name,
+      token,
+    );
+
+    if (!sent) {
+      return res.status(502).json({
+        error: "Could not send the confirmation email. Please try again shortly.",
+      });
+    }
+
+    res.json({ message: "Confirmation email sent." });
+  } catch (error) {
+    console.error("Resend verification error:", error);
+    res.status(500).json({ error: "Could not send confirmation email" });
   }
 };

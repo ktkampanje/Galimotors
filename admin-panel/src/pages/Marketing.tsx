@@ -41,7 +41,7 @@ interface AdPost {
   createdAt: string;
 }
 
-const SITE = 'https://galimotors.vercel.app';
+const SITE = 'https://galimotor.com';
 
 const slug = (s?: string) => (s || 'unknown').toLowerCase().replace(/[^a-z0-9]/g, '-');
 const carUrl = (car: AdCar) => `${SITE}/cars/${slug(car.maker?.name)}/${slug(car.model?.name)}/${car.id.split('-')[0]}`;
@@ -239,7 +239,7 @@ const Marketing: React.FC = () => {
                     <p className="text-[11px] text-gray-500 truncate">
                       {selectedCar.year} {selectedCar.maker?.name} {selectedCar.model?.name} for sale in {selectedCar.district || 'Malawi'}. Price: MK {Number(selectedCar.basePrice).toLocaleString('en-US')}.
                     </p>
-                    <p className="text-[10px] text-gray-400 uppercase mt-0.5">galimotors.vercel.app</p>
+                    <p className="text-[10px] text-gray-400 uppercase mt-0.5">galimotor.com</p>
                   </div>
                 </div>
               </div>

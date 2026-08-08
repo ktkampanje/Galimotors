@@ -130,7 +130,7 @@ async function main() {
     data: {
       name: 'GaliMotors Official',
       phone: '0990000000',
-      email: 'sales@galimotors.com',
+      email: 'sales@galimotor.com',
       sellerType: 'DEALER',
       location: 'Lilongwe',
       verifiedByPlatform: true,

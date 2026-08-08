@@ -294,7 +294,7 @@ const UserManagement: React.FC = () => {
                   value={formData.email}
                   onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                   className={inputCls}
-                  placeholder="user@galimotors.com"
+                  placeholder="user@galimotor.com"
                 />
               </div>
 

@@ -194,6 +194,79 @@ class CustomerAuthService {
     }
   }
 
+  /**
+   * Request a password reset link.
+   *
+   * Always resolves with the same message whether or not the address is
+   * registered — the server refuses to say, so that this form cannot be used
+   * to discover which emails have accounts. There is deliberately nothing to
+   * branch on here.
+   */
+  async forgotPassword(email: string): Promise<string> {
+    const response = await fetch(`${API_BASE_URL}/customer/auth/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+
+    if (!response.ok) {
+      throw new Error(await this.readError(response, 'Could not send the reset email'));
+    }
+
+    const result = await response.json();
+    return result.message as string;
+  }
+
+  /** Spend a reset token and set a new password. */
+  async resetPassword(token: string, password: string): Promise<string> {
+    const response = await fetch(`${API_BASE_URL}/customer/auth/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, password })
+    });
+
+    if (!response.ok) {
+      throw new Error(await this.readError(response, 'Could not reset your password'));
+    }
+
+    const result = await response.json();
+    return result.message as string;
+  }
+
+  /** Confirm an email address from the link in the signup email. */
+  async verifyEmail(token: string): Promise<string> {
+    const response = await fetch(`${API_BASE_URL}/customer/auth/verify-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token })
+    });
+
+    if (!response.ok) {
+      throw new Error(await this.readError(response, 'Could not confirm your email address'));
+    }
+
+    const result = await response.json();
+    return result.message as string;
+  }
+
+  /** Re-send the confirmation email to the signed-in customer. */
+  async resendVerification(): Promise<string> {
+    const token = this.getToken();
+    if (!token) throw new Error('Not authenticated');
+
+    const response = await fetch(`${API_BASE_URL}/customer/auth/resend-verification`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    if (!response.ok) {
+      throw new Error(await this.readError(response, 'Could not send the confirmation email'));
+    }
+
+    const result = await response.json();
+    return result.message as string;
+  }
+
   // Save authentication data
   private saveAuth(token: string, customer: Customer, refreshToken?: string): void {
     localStorage.setItem(TOKEN_KEY, token);

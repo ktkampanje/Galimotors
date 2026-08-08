@@ -28,7 +28,12 @@ const CACHE_TTL_MS = 30_000;
 
 let warnedUnconfigured = false;
 
-let cache: { whatsApp: string | null; phone: string | null; at: number } | null = null;
+let cache: {
+  whatsApp: string | null;
+  phone: string | null;
+  email: string | null;
+  at: number;
+} | null = null;
 
 export const invalidateBusinessContactCache = () => {
   cache = null;
@@ -39,7 +44,7 @@ const loadFromDatabase = async () => {
   try {
     const settings = await prisma.globalSettings.findUnique({
       where: { id: "SETTINGS_SINGLETON" },
-      select: { adminWhatsApp: true, adminPhone: true },
+      select: { adminWhatsApp: true, adminPhone: true, businessEmail: true },
     });
     return settings;
   } catch (error) {
@@ -61,6 +66,12 @@ const resolve = async () => {
     settings?.adminPhone || process.env.ADMIN_PHONE || process.env.ADMIN_WHATSAPP
   );
 
+  // Where admin alerts land. Validated loosely — the aim is to reject the
+  // empty string and obvious junk, not to police address syntax, since a
+  // rejected address here means a new lead reaches nobody.
+  const rawEmail = (settings?.businessEmail || process.env.ADMIN_EMAIL || "").trim();
+  const email = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawEmail) ? rawEmail : null;
+
   if (!whatsApp && !warnedUnconfigured) {
     warnedUnconfigured = true;
     console.warn(
@@ -70,7 +81,7 @@ const resolve = async () => {
     );
   }
 
-  cache = { whatsApp, phone, at: Date.now() };
+  cache = { whatsApp, phone, email, at: Date.now() };
   return cache;
 };
 
@@ -82,4 +93,15 @@ export const getAdminWhatsApp = async (): Promise<string | null> => {
 /** The business phone number in international digits form, or null. */
 export const getAdminPhone = async (): Promise<string | null> => {
   return (await resolve()).phone;
+};
+
+/**
+ * The inbox that receives admin alerts — new inquiries, quote requests,
+ * viewing bookings, sell submissions.
+ *
+ * This is the businessEmail from the admin Settings page, so it moves with
+ * the business rather than being pinned to whoever set the server up.
+ */
+export const getAdminEmail = async (): Promise<string | null> => {
+  return (await resolve()).email;
 };

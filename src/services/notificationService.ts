@@ -1,7 +1,8 @@
 // Notification Service for GaliMotors
 // Supports: WhatsApp, SMS, Email
 
-import { getAdminWhatsApp } from '../lib/businessContact';
+import { escapeHtml, isEmailConfigured as resendConfigured, renderEmail, sendMail } from '../lib/email';
+import { getAdminEmail, getAdminWhatsApp } from '../lib/businessContact';
 
 interface NotificationPayload {
   to: string; // Phone number or email
@@ -34,13 +35,8 @@ const isSMSConfigured = () => {
   );
 };
 
-const isEmailConfigured = () => {
-  return !!(
-    process.env.SMTP_HOST &&
-    process.env.SMTP_USER &&
-    process.env.SMTP_PASS
-  );
-};
+// Email runs on Resend now, so configuration is a single API key.
+const isEmailConfigured = () => resendConfigured();
 
 // Send WhatsApp message via Twilio
 export const sendWhatsApp = async (to: string, message: string): Promise<NotificationResult> => {
@@ -141,71 +137,48 @@ export const sendSMS = async (to: string, message: string): Promise<Notification
   }
 };
 
-// Send Email via SMTP
+// Send Email via Resend
 export const sendEmail = async (
   to: string,
   subject: string,
   message: string
 ): Promise<NotificationResult> => {
-  try {
-    if (!isEmailConfigured()) {
-      console.warn(
-        '[notifications] Email not configured — message NOT sent to %s. ' +
-        'Set SMTP_HOST / SMTP_USER / SMTP_PASS and install the nodemailer package.',
-        to
-      );
-      return {
-        success: false,
-        provider: 'email-unconfigured',
-        error: 'Email provider is not configured on this server'
-      };
-    }
-
-    const nodemailer = require('nodemailer');
-    const businessNumber = await getAdminWhatsApp();
-
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: process.env.SMTP_SECURE === 'true',
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS
-      }
-    });
-
-    const result = await transporter.sendMail({
-      from: `"GaliMotors" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
-      to,
-      subject,
-      text: message,
-      // #13293D is the brand navy; this previously used the retired coral.
-      // The contact number comes from settings so it tracks the admin panel.
-      html: `<div style="font-family: Arial, sans-serif; padding: 20px;">
-        <h2 style="color: #13293D;">GaliMotors</h2>
-        <p>${message.replace(/\n/g, '<br>')}</p>
-        <hr style="border: 1px solid #eee; margin: 20px 0;">
-        <p style="color: #666; font-size: 12px;">
-          This is an automated message from GaliMotors.${
-            businessNumber ? `<br>For inquiries, contact us at ${businessNumber}` : ''
-          }
-        </p>
-      </div>`
-    });
-
-    return {
-      success: true,
-      provider: 'smtp',
-      messageId: result.messageId
-    };
-  } catch (error: any) {
-    console.error('Email send failed:', error);
+  if (!isEmailConfigured()) {
+    console.warn(
+      '[notifications] Email not configured — message NOT sent to %s. ' +
+      'Set RESEND_API_KEY (and RESEND_FROM) to enable it.',
+      to
+    );
     return {
       success: false,
-      provider: 'email',
-      error: error.message
+      provider: 'email-unconfigured',
+      error: 'Email provider is not configured on this server'
     };
   }
+
+  // Templates below are authored as plain text with blank lines between
+  // paragraphs. That structure is exactly what the HTML layout wants, so it is
+  // reused rather than dumping the whole body into one <p> as the old SMTP
+  // version did. Single newlines stay as line breaks (address blocks, lists).
+  const paragraphs = message
+    .split(/\n{2,}/)
+    .map((block) => escapeHtml(block.trim()).replace(/\n/g, '<br>'))
+    .filter(Boolean);
+
+  // Subjects are suffixed "- GaliMotors" for the inbox list, where the sender
+  // is not always visible. Inside the email the brand is already in the header,
+  // so the suffix would just read as a stutter.
+  const heading = subject.replace(/\s*[-–—]\s*GaliMotors.*$/i, '').trim() || subject;
+
+  const html = await renderEmail({ heading, paragraphs });
+  const result = await sendMail({ to, subject, html, text: message });
+
+  return {
+    success: result.success,
+    provider: 'resend',
+    messageId: result.messageId,
+    error: result.error
+  };
 };
 
 // Smart notification with fallback (WhatsApp → SMS → Email)
@@ -234,6 +207,56 @@ export const sendNotification = async (payload: NotificationPayload): Promise<No
     success: false,
     provider: 'unknown',
     error: 'Invalid notification type'
+  };
+};
+
+/**
+ * Alert the business that something needs a human: a new inquiry, a quote
+ * request, a viewing booking, a car submitted for sale.
+ *
+ * Fans out to BOTH channels instead of falling back between them. Falling
+ * back would mean the WhatsApp attempt has to fail before email is tried —
+ * and WhatsApp is unconfigured (no Twilio), so every alert would take the
+ * slow path. More importantly these are leads: a missed one is lost revenue,
+ * so a duplicate alert is far cheaper than a dropped one.
+ *
+ * Recipients come from the admin Settings page via businessContact, so they
+ * follow the business rather than the server's environment.
+ */
+export const notifyAdmin = async (
+  subject: string,
+  message: string
+): Promise<NotificationResult> => {
+  const [adminWhatsApp, adminEmail] = await Promise.all([
+    getAdminWhatsApp(),
+    getAdminEmail(),
+  ]);
+
+  const results: NotificationResult[] = [];
+
+  if (adminWhatsApp) {
+    results.push(await sendWhatsApp(adminWhatsApp, message));
+  }
+
+  if (adminEmail) {
+    results.push(await sendEmail(adminEmail, subject, message));
+  } else {
+    console.warn(
+      '[notifications] No business email configured — admin alert "%s" was not emailed. ' +
+      'Set it on the admin Settings page (businessEmail).',
+      subject
+    );
+  }
+
+  const delivered = results.find((r) => r.success);
+  if (delivered) return delivered;
+
+  return {
+    success: false,
+    provider: 'admin-alert',
+    error:
+      results.map((r) => r.error).filter(Boolean).join('; ') ||
+      'No admin contact is configured',
   };
 };
 
@@ -271,6 +294,24 @@ export const templates = {
     subject: 'Payment Pending - GaliMotors Admin'
   }),
 
+  quoteRequested: (carTitle: string, customerName: string, customerPhone: string) => ({
+    message: `📄 Quote Requested\n\nCar: ${carTitle}\nCustomer: ${customerName}\nPhone: ${customerPhone}\n\nSend a quote from the admin panel.`,
+    subject: 'Quote Requested - GaliMotors Admin'
+  }),
+
+  viewingBooked: (carTitle: string, customerName: string, customerPhone: string, when?: string | null) => ({
+    message:
+      `📅 Viewing Booked\n\nCar: ${carTitle}\nCustomer: ${customerName}\nPhone: ${customerPhone}` +
+      (when ? `\nRequested: ${when}` : '') +
+      `\n\nConfirm the appointment in the admin panel.`,
+    subject: 'Viewing Booked - GaliMotors Admin'
+  }),
+
+  sellRequestSubmitted: (sellerName: string, sellerPhone: string, vehicle: string) => ({
+    message: `🚗 Car Submitted For Sale\n\nVehicle: ${vehicle}\nSeller: ${sellerName}\nPhone: ${sellerPhone}\n\nReview it under Sell Requests in the admin panel.`,
+    subject: 'New Sell Request - GaliMotors Admin'
+  }),
+
   // Seller notifications
   carSold: (sellerName: string, carTitle: string, price: number, commission: number) => ({
     message: `🎉 Congratulations ${sellerName}!\n\nYour ${carTitle} has been sold!\n\nSale Price: MK ${price.toLocaleString()}\nYour Commission: MK ${commission.toLocaleString()}\n\nGaliMotors`,
@@ -291,6 +332,7 @@ export const sendBatchNotifications = async (
 };
 
 export default {
+  notifyAdmin,
   sendWhatsApp,
   sendSMS,
   sendEmail,

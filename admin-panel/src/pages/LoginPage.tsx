@@ -155,7 +155,7 @@ const LoginPage = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full pl-11 pr-4 py-3 bg-surface border border-border rounded-xl font-medium text-text-primary placeholder:text-text-tertiary focus:border-coral focus:ring-2 focus:ring-coral/15 outline-none transition-all"
-                  placeholder="admin@galimotors.com"
+                  placeholder="admin@galimotor.com"
                   required
                   autoComplete="email"
                   autoFocus

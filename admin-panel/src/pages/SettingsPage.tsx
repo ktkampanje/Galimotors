@@ -26,7 +26,7 @@ const SettingsPage: React.FC = () => {
     petrolPrice: 1200,
     adminWhatsApp: '265990000000',
     adminPhone: '265990000000',
-    businessEmail: 'admin@galimotors.com',
+    businessEmail: 'admin@galimotor.com',
     bankName: 'National Bank of Malawi',
     bankAccountName: 'GaliMotors Ltd',
     bankAccountNumber: '100 234 5678',
@@ -75,7 +75,7 @@ const SettingsPage: React.FC = () => {
           petrolPrice: 1200,
           adminWhatsApp: response.data.adminWhatsApp || '265990000000',
           adminPhone: response.data.adminPhone || '265990000000',
-          businessEmail: response.data.businessEmail || 'info@galimotors.com',
+          businessEmail: response.data.businessEmail || 'info@galimotor.com',
           bankName: response.data.bankName || 'National Bank of Malawi',
           bankAccountName: response.data.bankAccountName || 'GaliMotors Ltd',
           bankAccountNumber: response.data.bankAccountNumber || '100 234 5678',
@@ -319,7 +319,7 @@ const SettingsPage: React.FC = () => {
                      : 'bg-gray-50 border-gray-100 text-gray-500 cursor-not-allowed'
                  }`}
                  type="email"
-                 placeholder="admin@galimotors.com"
+                 placeholder="admin@galimotor.com"
                  value={form.businessEmail}
                  onChange={(e) => setForm({ ...form, businessEmail: e.target.value })}
                  disabled={!isSuperAdmin}

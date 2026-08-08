@@ -3,6 +3,7 @@ import { runSoldCarsCleanup, runTrashPurge } from "../jobs/soldCarsCleanupJob";
 import { runReservationExpiry } from "../jobs/reservationExpiryJob";
 import { updateFilterStatsCache } from "../services/filterStatsCacheService";
 import { logServerError, pruneOldErrors } from "../services/errorLogService";
+import { pruneVerificationTokens } from "../lib/verificationTokens";
 import { EXPORT_ORDER } from "../scripts/dataOrder";
 import prisma from "../lib/prisma";
 
@@ -51,6 +52,12 @@ router.get("/daily", async (req, res) => {
   await run("errorLogPrune", async () => {
     const pruned = await pruneOldErrors(30);
     results.errorLogPrune = `ok (${pruned} pruned)`;
+  });
+  // Spent and expired password-reset / email-verification tokens. Harmless if
+  // left (they are already unusable), but the table would grow without bound.
+  await run("verificationTokenPrune", async () => {
+    const pruned = await pruneVerificationTokens();
+    results.verificationTokenPrune = `ok (${pruned} pruned)`;
   });
 
   const failed = Object.values(results).some((v) => v.startsWith("FAILED"));

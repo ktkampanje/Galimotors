@@ -14,6 +14,8 @@ import RecentlyViewedPage from './pages/RecentlyViewedPage';
 import CustomerDashboard from './pages/CustomerDashboard';
 import QuoteView from './pages/QuoteView';
 import ViewingView from './pages/ViewingView';
+import ResetPassword from './pages/ResetPassword';
+import VerifyEmail from './pages/VerifyEmail';
 import PWAUpdater from './components/PWAUpdater';
 import { LoginModal } from './components/LoginModal';
 import { RegisterModal } from './components/RegisterModal';
@@ -101,6 +103,11 @@ function App() {
                   benefits from a real URL and a working back button. */}
               <Route path="/book-viewing/:uuidShort" element={<BookViewing />} />
               <Route path="/sell" element={<SellYourCar />} />
+              {/* Landing pages for links in transactional email. Pages, not
+                  modals: the customer arrives cold from their inbox, often on
+                  another device, so there is no modal stack to open into. */}
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/verify-email" element={<VerifyEmail />} />
               {/* Legacy route for backward compatibility */}
               <Route path="/car/:id" element={<LegacyCarRedirect />} />
               {/* Footer/support pages — copy is edited in the admin panel.

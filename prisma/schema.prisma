@@ -38,6 +38,31 @@ model Customer {
   recentlyViewed  RecentlyViewed[]
   favorites       Favorite[]
   leads           Lead[]    // All inquiries from this customer
+  verificationTokens VerificationToken[]
+}
+
+// ============== VERIFICATION TOKENS ========= //
+// Backs password reset and email verification.
+//
+// Only the SHA-256 hash of each token is stored. The raw value exists once, in
+// the emailed link, and is never written down — so a leaked database dump
+// cannot be replayed to take over accounts, which is precisely the exposure a
+// plaintext reset-token table creates.
+//
+// Rows are single-use (usedAt) and short-lived (expiresAt); the daily cleanup
+// cron prunes spent and expired ones.
+model VerificationToken {
+  id         String    @id @default(uuid())
+  customerId String
+  customer   Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  tokenHash  String    @unique
+  purpose    String    // PASSWORD_RESET | EMAIL_VERIFY
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([customerId, purpose])
+  @@index([expiresAt])
 }
 
 // ============== RECENTLY VIEWED ============= //
@@ -332,7 +357,7 @@ model GlobalSettings {
   accommodationFee Float   // Changed from Decimal to Float
   adminWhatsApp     String  @default("265990000000")
   adminPhone        String  @default("265990000000")
-  businessEmail     String  @default("info@galimotors.com")
+  businessEmail     String  @default("info@galimotor.com")
   
   // Payment Methods
   bankName          String  @default("National Bank of Malawi")

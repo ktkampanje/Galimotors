@@ -35,7 +35,7 @@ export const parseCarUrl = (_makerSlug: string, _modelSlug: string, uuidShort: s
 };
 
 // Generate canonical URL for a car (full domain)
-export const generateCanonicalUrl = (car: CarUrlData, baseUrl: string = 'https://galimotors.com'): string => {
+export const generateCanonicalUrl = (car: CarUrlData, baseUrl: string = 'https://galimotor.com'): string => {
   const path = generateCarUrl(car);
   return `${baseUrl}${path}`;
 };
@@ -75,7 +75,7 @@ export const generateMetaDescription = (car: SeoCarData): string => {
 };
 
 // Generate OpenGraph data for social sharing
-export const generateOpenGraphData = (car: SeoCarData, baseUrl: string = 'https://galimotors.com') => {
+export const generateOpenGraphData = (car: SeoCarData, baseUrl: string = 'https://galimotor.com') => {
   const canonicalUrl = generateCanonicalUrl(car, baseUrl);
   const description = generateMetaDescription(car);
   const primaryImage = car.images?.find((img) => img.isPrimary)?.url ||
@@ -93,7 +93,7 @@ export const generateOpenGraphData = (car: SeoCarData, baseUrl: string = 'https:
 };
 
 // Generate JSON-LD structured data for a car
-export const generateCarJsonLD = (car: SeoCarData, baseUrl: string = 'https://galimotors.com') => {
+export const generateCarJsonLD = (car: SeoCarData, baseUrl: string = 'https://galimotor.com') => {
   const canonicalUrl = generateCanonicalUrl(car, baseUrl);
 
   return {

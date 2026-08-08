@@ -11,8 +11,9 @@ interface SitemapUrl {
 
 export class SEOService {
   // Always the DEPLOYED host. The old constructor default hardcoded
-  // https://galimotors.com — a domain the live site does not use, so every
-  // sitemap/canonical/OG URL pointed somewhere else entirely.
+  // https://galimotors.com — note the plural, a domain the business does not
+  // own (the live one is galimotor.com), so every sitemap/canonical/OG URL
+  // pointed somewhere else entirely.
   private get baseUrl(): string {
     return getSiteUrl();
   }

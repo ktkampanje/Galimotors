@@ -36,7 +36,7 @@ export class ContactService {
       return {
         adminWhatsApp: this.adminPhone,
         adminPhone: this.adminPhone,
-        businessEmail: 'info@galimotors.com',
+        businessEmail: 'info@galimotor.com',
         driverAllowance: 15000,
         accommodationFee: 25000
       };

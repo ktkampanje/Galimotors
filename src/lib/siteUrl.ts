@@ -14,7 +14,7 @@ export const getSiteUrl = (): string => {
   const explicit = process.env.PUBLIC_SITE_URL || process.env.FRONTEND_URL;
   if (explicit) return explicit.replace(/\/+$/, "");
 
-  // The PUBLIC production domain (e.g. galimotors.vercel.app). This must be
+  // The PUBLIC production domain (e.g. galimotor.com). This must be
   // preferred over VERCEL_URL: that one is the per-deployment internal host,
   // which Vercel gates behind its own login — a customer who tapped a
   // WhatsApp quote link built from it was asked to "Log in to Vercel".

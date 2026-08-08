@@ -133,27 +133,26 @@ export const createInquiryLead = async (req: Request, res: Response) => {
       type: "whatsapp",
     });
 
-    // 7. Send notification to admin
+    // 7. Alert the business. notifyAdmin fans out to email AND WhatsApp, so
+    //    the lead still lands while automated WhatsApp is unconfigured — this
+    //    previously required a WhatsApp number and then sent nothing.
+    //    adminWhatsApp is still resolved here for the click-to-chat URL below.
     const adminWhatsApp = await getAdminWhatsApp();
-    if (adminWhatsApp) {
-      const adminNotification = isPaidViewing
-        ? notificationService.templates.paymentPending(
-            lead.car.title,
-            buyerName,
-            Number(paymentAmount) || Number(calculatedTotalCost) || 0,
-          )
-        : notificationService.templates.newInquiry(
-            lead.car.title,
-            buyerName,
-            sanitizedPhone,
-          );
-      await notificationService.sendNotification({
-        to: adminWhatsApp,
-        message: adminNotification.message,
-        subject: adminNotification.subject,
-        type: "whatsapp",
-      });
-    }
+    const adminNotification = isPaidViewing
+      ? notificationService.templates.paymentPending(
+          lead.car.title,
+          buyerName,
+          Number(paymentAmount) || Number(calculatedTotalCost) || 0,
+        )
+      : notificationService.templates.newInquiry(
+          lead.car.title,
+          buyerName,
+          sanitizedPhone,
+        );
+    await notificationService.notifyAdmin(
+      adminNotification.subject,
+      adminNotification.message,
+    );
 
     // 8. Return lead object with WhatsApp URL
     const waMessage = `Hi GaliMotors! I'm interested in the ${lead.car.title} (ID: ${lead.carId.substring(0, 5)}). My name is ${buyerName}. Please share more details.`;
@@ -289,21 +288,16 @@ export const updateLeadPayment = async (req: Request, res: Response) => {
       },
     });
 
-    // Send notification to admin about pending payment
-    const adminWhatsApp = await getAdminWhatsApp();
-    if (adminWhatsApp) {
-      const adminNotification = notificationService.templates.paymentPending(
-        existingLead.car.title,
-        existingLead.buyerName,
-        Number(existingLead.car.basePrice),
-      );
-      await notificationService.sendNotification({
-        to: adminWhatsApp,
-        message: adminNotification.message,
-        subject: adminNotification.subject,
-        type: "whatsapp",
-      });
-    }
+    // Alert the business about the pending payment.
+    const adminNotification = notificationService.templates.paymentPending(
+      existingLead.car.title,
+      existingLead.buyerName,
+      Number(existingLead.car.basePrice),
+    );
+    await notificationService.notifyAdmin(
+      adminNotification.subject,
+      adminNotification.message,
+    );
 
     res.json(lead);
   } catch (error) {
@@ -997,18 +991,13 @@ export const acceptQuote = async (req: Request, res: Response) => {
       },
     });
 
-    // Notify admin via WhatsApp
-    const adminWhatsApp = await getAdminWhatsApp();
-    if (adminWhatsApp) {
-      const adminMessage = `🎉 Quote Accepted!\n\n${lead.buyerName} accepted the quote for ${lead.car.title}\n\n💰 Price: MK ${(lead.quotedPrice || lead.car.basePrice).toLocaleString()}\n📞 Phone: ${lead.buyerPhone}\n🔗 Ref: ${lead.referenceNumber}\n\nContact them to proceed!`;
+    // Alert the business on both channels.
+    const adminMessage = `🎉 Quote Accepted!\n\n${lead.buyerName} accepted the quote for ${lead.car.title}\n\n💰 Price: MK ${(lead.quotedPrice || lead.car.basePrice).toLocaleString()}\n📞 Phone: ${lead.buyerPhone}\n🔗 Ref: ${lead.referenceNumber}\n\nContact them to proceed!`;
 
-      await notificationService.sendNotification({
-        to: adminWhatsApp,
-        message: adminMessage,
-        subject: "Quote Accepted",
-        type: "whatsapp",
-      });
-    }
+    await notificationService.notifyAdmin(
+      "Quote Accepted - GaliMotors Admin",
+      adminMessage,
+    );
 
     res.json({
       message: "Quote accepted successfully",
@@ -1059,18 +1048,13 @@ export const declineQuote = async (req: Request, res: Response) => {
       },
     });
 
-    // Notify admin
-    const adminWhatsApp = await getAdminWhatsApp();
-    if (adminWhatsApp) {
-      const adminMessage = `⚠️ Quote Declined\n\n${lead.buyerName} declined the quote for ${lead.car.title}\n\n📝 Reason: ${declineMessage}\n📞 Phone: ${lead.buyerPhone}\n🔗 Ref: ${lead.referenceNumber}`;
+    // Alert the business on both channels.
+    const adminMessage = `⚠️ Quote Declined\n\n${lead.buyerName} declined the quote for ${lead.car.title}\n\n📝 Reason: ${declineMessage}\n📞 Phone: ${lead.buyerPhone}\n🔗 Ref: ${lead.referenceNumber}`;
 
-      await notificationService.sendNotification({
-        to: adminWhatsApp,
-        message: adminMessage,
-        subject: "Quote Declined",
-        type: "whatsapp",
-      });
-    }
+    await notificationService.notifyAdmin(
+      "Quote Declined - GaliMotors Admin",
+      adminMessage,
+    );
 
     res.json({
       message: "Quote declined",
@@ -1129,22 +1113,21 @@ export const submitCounterOffer = async (req: Request, res: Response) => {
       },
     });
 
-    // Notify admin about counter-offer
+    // Alert the business on both channels.
+    const adminMessage = `💬 New Counter-Offer!\n\n${lead.buyerName} counter-offered on ${lead.car.title}\n\n${counterPrice ? `💰 Their Price: MK ${parseFloat(counterPrice).toLocaleString()}\n` : ""}${counterTerms ? `💳 Terms: ${counterTerms}\n` : ""}${counterMessage ? `📝 Message: ${counterMessage}\n` : ""}\n📞 Phone: ${lead.buyerPhone}\n🔗 Ref: ${lead.referenceNumber}\n\nRespond in admin panel.`;
+
+    await notificationService.notifyAdmin(
+      "Counter-Offer Received - GaliMotors Admin",
+      adminMessage,
+    );
+
+    // Click-to-chat link for the CUSTOMER to send this offer to GaliMotors.
+    // Built with buildWhatsAppUrl rather than string concatenation: the
+    // hand-rolled version here produced "wa.me/null" whenever no business
+    // number was configured. Null instead means the UI omits the button.
     const adminWhatsApp = await getAdminWhatsApp();
-    if (adminWhatsApp) {
-      const adminMessage = `💬 New Counter-Offer!\n\n${lead.buyerName} counter-offered on ${lead.car.title}\n\n${counterPrice ? `💰 Their Price: MK ${parseFloat(counterPrice).toLocaleString()}\n` : ""}${counterTerms ? `💳 Terms: ${counterTerms}\n` : ""}${counterMessage ? `📝 Message: ${counterMessage}\n` : ""}\n📞 Phone: ${lead.buyerPhone}\n🔗 Ref: ${lead.referenceNumber}\n\nRespond in admin panel.`;
-
-      await notificationService.sendNotification({
-        to: adminWhatsApp,
-        message: adminMessage,
-        subject: "Counter-Offer Received",
-        type: "whatsapp",
-      });
-    }
-
-    // Generate WhatsApp message for the CUSTOMER to send to GaliMotors
     const customerWhatsAppMessage = `Hi GaliMotors! 👋\n\nI'm responding to my quote for the ${lead.car.title} (Ref: ${lead.referenceNumber}).\n\n${counterPrice ? `💰 My Offer: MK ${parseFloat(counterPrice).toLocaleString()}\n` : ""}${counterTerms ? `💳 Terms: ${counterTerms}\n` : ""}${counterMessage ? `\n📝 ${counterMessage}\n` : ""}`;
-    const whatsappUrl = `https://wa.me/${adminWhatsApp}?text=${encodeURIComponent(customerWhatsAppMessage)}`;
+    const whatsappUrl = buildWhatsAppUrl(adminWhatsApp, customerWhatsAppMessage);
 
     // Build updated conversation
     const conversation = buildConversationTrail(updatedLead);
@@ -1503,16 +1486,11 @@ export const addViewingMessage = async (req: Request, res: Response) => {
       }
     });
     
-    // Notify admin
-    const adminWhatsApp = await getAdminWhatsApp();
-    if (adminWhatsApp) {
-      await notificationService.sendNotification({
-        to: adminWhatsApp,
-        message: `New message on Viewing Request ${lead.referenceNumber} for ${lead.car.title} from ${lead.buyerName}:\n\n"${message}"`,
-        subject: "New Viewing Message",
-        type: "whatsapp"
-      });
-    }
+    // Alert the business on both channels.
+    await notificationService.notifyAdmin(
+      "New Viewing Message - GaliMotors Admin",
+      `New message on Viewing Request ${lead.referenceNumber} for ${lead.car.title} from ${lead.buyerName}:\n\n"${message}"`,
+    );
 
     res.json(newMsg);
   } catch (error) {

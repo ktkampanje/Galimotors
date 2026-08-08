@@ -3,9 +3,12 @@ import prisma from "../lib/prisma";
 import { authenticate, authorize } from "../middleware/auth";
 import { sanitizePhone } from "../middleware/sanitize";
 import { inquiryRateLimit } from "../middleware/security";
+import notificationService from "../services/notificationService";
 
 // "Sell Your Car" — owners asking GaliMotors to sell for them. Public submit,
-// admin-only reading; follow-up happens on WhatsApp (nothing auto-sends).
+// admin-only reading; follow-up to the seller happens on WhatsApp. Submitting
+// alerts the business, since the seller has no account and no way to chase a
+// request that nobody noticed.
 const router = Router();
 
 router.post("/", inquiryRateLimit, async (req: Request, res: Response) => {
@@ -37,6 +40,26 @@ router.post("/", inquiryRateLimit, async (req: Request, res: Response) => {
         expectedPrice: Number.isFinite(parsedPrice as number) ? parsedPrice : null,
       },
     });
+
+    // Best-effort: a notification failure must not tell the seller their
+    // submission was rejected, because it was saved successfully.
+    try {
+      const vehicle =
+        request.carDetails.slice(0, 200) +
+        (request.expectedPrice
+          ? `\nAsking: MK ${Number(request.expectedPrice).toLocaleString()}`
+          : "") +
+        (request.district ? `\nDistrict: ${request.district}` : "");
+
+      const alert = notificationService.templates.sellRequestSubmitted(
+        request.name,
+        request.phone,
+        vehicle,
+      );
+      await notificationService.notifyAdmin(alert.subject, alert.message);
+    } catch (notifyError) {
+      console.error("Failed to alert admin about sell request:", notifyError);
+    }
 
     res.status(201).json({ message: "Request received", request: { id: request.id } });
   } catch (error) {
